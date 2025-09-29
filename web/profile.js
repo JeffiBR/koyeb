@@ -10,9 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentUserProfile = null;
 
-    // Assumindo que 'authenticatedFetch', 'getSession', e 'supabase' estão definidos globalmente
-    // ou importados em outro script (auth.js, supabase.js, etc.)
-
     /**
      * Função auxiliar para formatar o nome do campo (ex: full_name -> Full Name)
      */
@@ -28,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadProfile = async () => {
         try {
             // Usa a função centralizada do auth.js para uma chamada segura
+            // (Assume-se que 'authenticatedFetch' está definido em outro lugar)
             const response = await authenticatedFetch('/api/users/me');
 
             if (!response.ok) {
@@ -35,18 +33,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(err.detail || 'Não foi possível carregar o perfil.');
             }
 
-            currentUserProfile = await response.json();
+            // Armazena todos os dados do perfil, incluindo role e allowed_pages
+            currentUserProfile = await response.json(); 
 
             // Preenche o formulário com os dados existentes
             fullNameInput.value = currentUserProfile.full_name || '';
             jobTitleInput.value = currentUserProfile.job_title || '';
             if (currentUserProfile.avatar_url && userAvatar) {
-                userAvatar.src = currentUserProfile.avatar_url;
+                // Adiciona um timestamp para evitar cache em navegadores mais agressivos
+                userAvatar.src = `${currentUserProfile.avatar_url}?t=${Date.now()}`; 
             }
 
         } catch (error) {
-            console.error(error);
-            uploadStatus.textContent = error.message;
+            console.error('Erro ao carregar perfil:', error);
+            uploadStatus.textContent = error.message || 'Erro ao carregar perfil.';
             uploadStatus.style.color = 'var(--error)';
         }
     };
@@ -55,7 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
      * Lida com o upload da foto e a atualização dos dados do perfil.
      */
     const handleProfileUpdate = async () => {
-        const session = await getSession(); // Pega a sessão para o ID do usuário
+        // (Assume-se que 'getSession' está definido em outro lugar)
+        const session = await getSession(); 
         if (!session) {
             alert("Sessão não encontrada. Faça o login.");
             return;
@@ -68,7 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const file = avatarFileInput.files[0];
-            let avatarUrl = currentUserProfile ? currentUserProfile.avatar_url : null; // Mantém a URL antiga por padrão
+            // Usa a URL existente (se o perfil foi carregado) ou null
+            let avatarUrl = currentUserProfile ? currentUserProfile.avatar_url : null; 
 
             // 1. Se um novo arquivo foi selecionado, faz o upload para o Supabase Storage
             if (file) {
@@ -79,19 +81,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const fileExt = file.name.split('.').pop();
                 const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
 
+                // (Assume-se que 'supabase' está definido em outro lugar)
                 const { data: uploadData, error: uploadError } = await supabase
                     .storage
                     .from('avatars')
-                    .upload(filePath, file, {
-                        cacheControl: '3600',
-                        upsert: false // Mudar para true se quiser substituir o arquivo
-                    });
+                    .upload(filePath, file, { upsert: true }); // Usando upsert para garantir a substituição
 
                 if (uploadError) {
                     throw uploadError;
                 }
 
-                // Supabase retorna o path, precisamos da URL pública
                 const { data: urlData } = supabase
                     .storage
                     .from('avatars')
@@ -101,11 +100,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 uploadStatus.textContent = 'Foto enviada com sucesso!';
             }
 
-            // 2. Monta o corpo da requisição para atualizar o perfil no banco de dados
+            // 2. Monta o corpo da requisição APENAS com os campos que o endpoint /api/users/me aceita.
             const updateData = {
                 full_name: fullNameInput.value.trim(),
                 job_title: jobTitleInput.value.trim(),
-                // Garante que avatarUrl seja enviado (pode ser null se não houver avatar)
                 avatar_url: avatarUrl || null 
             };
 
@@ -118,28 +116,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(updateData)
             });
 
-            // --- PONTO DA CORREÇÃO 1: MODO DE LANÇAR O ERRO ---
+            // Se a resposta da API não for 'ok', lança o corpo do erro (o JSON inteiro)
             if (!response.ok) {
                 const errorData = await response.json();
-                // Lança o objeto JSON de erro completo (FastAPI/Pydantic)
-                throw errorData; 
+                throw errorData;
             }
 
             uploadStatus.textContent = 'Perfil atualizado com sucesso!';
             uploadStatus.style.color = 'var(--success)';
             
-            // Atualiza o avatar na barra superior
             if (userAvatar && avatarUrl) {
-                // Adiciona um timestamp para forçar o navegador a recarregar a nova imagem
+                // Força o recarregamento da nova imagem
                 userAvatar.src = `${avatarUrl}?t=${Date.now()}`; 
             }
-
-            // Recarrega o perfil para sincronizar o estado
+            
+            // Recarrega o perfil para sincronizar o estado e garantir que currentUserProfile tenha os dados mais recentes
             await loadProfile(); 
-            // Garante que o estado interno do perfil (que estava sendo usado antes da atualização) seja resetado
-            currentUserProfile = null; 
 
-        // --- PONTO DA CORREÇÃO 2: MODO DE CAPTURAR E EXIBIR O ERRO APRIMORADO ---
         } catch (error) {
             console.error('Erro detalhado ao atualizar perfil:', error);
             let displayMessage;
@@ -148,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (error && Array.isArray(error.detail)) {
                 // Mapeia cada objeto de erro para uma mensagem clara, formatando o nome do campo
                 displayMessage = error.detail.map(err => {
-                    // Tenta obter o nome do campo (loc[1]) ou usa 'Campo'
+                    // Tenta obter o nome do campo (loc[1])
                     const fieldName = formatFieldName(err.loc[1]); 
                     // Junta o nome do campo e a mensagem de erro (ex: 'Full Name: Field required')
                     return `${fieldName}: ${err.msg}`;
