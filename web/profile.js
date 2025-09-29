@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateProfileBtn = document.getElementById('updateProfileBtn');
     const uploadStatus = document.getElementById('uploadStatus');
     // A imagem do avatar na barra superior
-    const userAvatar = document.getElementById('userAvatar'); 
+    const userAvatar = document.getElementById('userAvatar');
 
     let currentUserProfile = null;
 
@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateProfileBtn.disabled = true;
         updateProfileBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Salvando...</span>';
         uploadStatus.textContent = '';
+        uploadStatus.style.color = ''; // Reseta a cor da mensagem
 
         try {
             const file = avatarFileInput.files[0];
@@ -66,17 +67,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const fileExt = file.name.split('.').pop();
                 const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
 
-                // Usa a biblioteca do Supabase diretamente para o upload
                 const { data: uploadData, error: uploadError } = await supabase
                     .storage
-                    .from('avatars') // O nome do seu bucket no Supabase
+                    .from('avatars')
                     .upload(filePath, file);
 
                 if (uploadError) {
                     throw uploadError;
                 }
 
-                // Pega a URL pública da imagem recém-enviada
                 const { data: urlData } = supabase
                     .storage
                     .from('avatars')
@@ -99,25 +98,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(updateData)
             });
 
+            // --- PONTO DA CORREÇÃO 1: MODO DE LANÇAR O ERRO ---
+            // Se a resposta da API não for 'ok', lançamos o corpo do erro (o JSON inteiro)
+            // em vez de tentar extrair uma propriedade que pode não ser um texto.
             if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.detail || 'Falha ao atualizar o perfil.');
+                const errorData = await response.json();
+                throw errorData;
             }
 
             uploadStatus.textContent = 'Perfil atualizado com sucesso!';
             uploadStatus.style.color = 'var(--success)';
             
-            // Atualiza a foto no menu da barra superior em tempo real
             if (userAvatar && avatarUrl) {
                 userAvatar.src = avatarUrl; 
             }
 
-            // Limpa o cache do perfil para forçar a busca de dados novos na próxima navegação
-            currentUserProfile = null; 
+            currentUserProfile = null;
 
+        // --- PONTO DA CORREÇÃO 2: MODO DE CAPTURAR E EXIBIR O ERRO ---
+        // O bloco catch agora é inteligente o suficiente para formatar diferentes tipos de erro.
         } catch (error) {
-            console.error('Erro ao atualizar perfil:', error);
-            uploadStatus.textContent = `Erro: ${error.message}`;
+            console.error('Erro detalhado ao atualizar perfil:', error);
+            let displayMessage;
+
+            // Caso 1: Erro de validação da sua API (FastAPI), que vem com um array em 'detail'.
+            if (error && Array.isArray(error.detail)) {
+                // Mapeia cada objeto de erro para sua mensagem e as une com ponto e vírgula.
+                displayMessage = error.detail.map(err => err.msg).join('; ');
+            } 
+            // Caso 2: Erro do Supabase ou outro erro padrão que possui a propriedade 'message'.
+            else if (error && error.message) {
+                displayMessage = error.message;
+            } 
+            // Caso 3: Um erro inesperado que não se encaixa nos padrões acima.
+            else {
+                displayMessage = 'Ocorreu uma falha desconhecida.';
+            }
+
+            uploadStatus.textContent = `Erro: ${displayMessage}`;
             uploadStatus.style.color = 'var(--error)';
         } finally {
             updateProfileBtn.disabled = false;
