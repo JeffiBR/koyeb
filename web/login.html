@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Admin Preços AL</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="login.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script src="theme.js"></script>
+</head>
+<body>
+    <button id="themeToggle" class="theme-toggle">
+        <i class="fas fa-moon"></i>
+    </button>
+
+    <div class="login-container">
+        <div class="login-header">
+            <h1>Admin Preços AL</h1>
+            <p>Acesso restrito ao sistema</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="email"><i class="fas fa-envelope"></i> Email</label>
+            <input type="email" id="email" placeholder="Seu email" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="password"><i class="fas fa-lock"></i> Senha</label>
+            <input type="password" id="password" placeholder="Sua senha" required>
+        </div>
+        
+        <button id="loginButton" class="btn">
+            <i class="fas fa-sign-in-alt"></i> Entrar
+        </button>
+        
+        <p id="errorMessage" class="error-message"></p>
+    </div>
+
+    <script src="login.js"></script>
+    <script src="mobile-menu.js"></script>
+</body>
+</html>
