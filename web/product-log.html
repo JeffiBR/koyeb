@@ -9,435 +9,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="product-log.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="auth.js"></script>
     <script src="theme.js"></script>
-    <style>
-        /* Estilos específicos para os filtros */
-        .filters-container {
-            background: linear-gradient(135deg, var(--input-dark), #0b1220);
-            border: 1px solid var(--border-dark);
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2), 
-                        inset 0 1px 0 rgba(255, 255, 255, 0.05);
-            padding: 25px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-        }
-        
-        body.light-mode .filters-container {
-            background: var(--input-light);
-            border: 1px solid var(--border-light);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-        }
-        
-        .filter-group {
-            position: relative;
-        }
-        
-        .filter-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            font-size: 0.85rem;
-            color: var(--muted-dark);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        body.light-mode .filter-group label {
-            color: var(--muted-light);
-        }
-        
-        .filter-group input, 
-        .filter-group select {
-            width: 100%;
-            padding: 12px 16px;
-            border: 2px solid var(--border-dark);
-            border-radius: 10px;
-            background: var(--panel-dark);
-            color: var(--text-dark);
-            font-family: inherit;
-            font-size: 0.95rem;
-            transition: all 0.3s ease;
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        
-        body.light-mode .filter-group input,
-        body.light-mode .filter-group select {
-            border: 2px solid var(--border-light);
-            background: var(--panel-light);
-            color: var(--text-light);
-        }
-        
-        .filter-group input:focus,
-        .filter-group select:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2),
-                        inset 0 2px 4px rgba(0, 0, 0, 0.1);
-            transform: translateY(-2px);
-        }
-        
-        .filter-group input:hover,
-        .filter-group select:hover {
-            border-color: rgba(79, 70, 229, 0.5);
-        }
-        
-        .search-input-group {
-            position: relative;
-        }
-        
-        .search-input-group i {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--muted-dark);
-            transition: color 0.3s ease;
-        }
-        
-        .search-input-group input {
-            padding-left: 45px !important;
-        }
-        
-        .search-input-group:focus-within i {
-            color: var(--primary);
-        }
-        
-        .items-per-page {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 15px;
-            background: var(--input-dark);
-            border-radius: 10px;
-            border: 1px solid var(--border-dark);
-        }
-        
-        body.light-mode .items-per-page {
-            background: var(--input-light);
-            border: 1px solid var(--border-light);
-        }
-        
-        .items-per-page span {
-            font-weight: 600;
-            font-size: 0.9rem;
-            color: var(--muted-dark);
-        }
-        
-        body.light-mode .items-per-page span {
-            color: var(--muted-light);
-        }
-        
-        .items-per-page select {
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 2px solid var(--border-dark);
-            background: var(--panel-dark);
-            color: var(--text-dark);
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        body.light-mode .items-per-page select {
-            border: 2px solid var(--border-light);
-            background: var(--panel-light);
-            color: var(--text-light);
-        }
-        
-        .items-per-page select:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
-        }
-        
-        /* Animações para os filtros */
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(79, 70, 229, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
-        }
-        
-        .filter-group input:focus,
-        .filter-group select:focus,
-        .items-per-page select:focus {
-            animation: pulse 1.5s infinite;
-        }
-        
-        /* Efeito de preenchimento para selects */
-        .filter-group select {
-            appearance: none;
-            -webkit-appearance: none;
-            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa4b2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-            background-repeat: no-repeat;
-            background-position: right 15px center;
-            background-size: 16px;
-        }
-        
-        body.light-mode .filter-group select {
-            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234b5563' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-        }
-        
-        /* Estilo para o container de filtros em dispositivos móveis */
-        @media (max-width: 768px) {
-            .filters-container {
-                padding: 15px;
-            }
-            
-            .filter-group input, 
-            .filter-group select {
-                padding: 10px 14px;
-            }
-            
-            .items-per-page {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 8px;
-            }
-        }
-
-        /* Estilos específicos para a tabela moderna */
-        .table-container {
-            background: linear-gradient(135deg, var(--panel-dark), #0a0f1a);
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--border-dark);
-            margin-bottom: 1.5rem;
-        }
-        
-        body.light-mode .table-container {
-            background: var(--panel-light);
-            border: 1px solid var(--border-light);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-        }
-        
-        .data-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            margin: 0;
-        }
-        
-        .data-table thead {
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        
-        .data-table th {
-            background: linear-gradient(135deg, var(--primary), var(--accent));
-            color: white;
-            padding: 16px 20px;
-            text-align: left;
-            font-weight: 600;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            position: relative;
-            border-bottom: 2px solid var(--border-dark);
-        }
-        
-        .data-table th:not(:last-child)::after {
-            content: '';
-            position: absolute;
-            right: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            height: 60%;
-            width: 1px;
-            background: rgba(255, 255, 255, 0.2);
-        }
-        
-        .data-table td {
-            padding: 16px 20px;
-            border-bottom: 1px solid var(--border-dark);
-            color: var(--text-dark);
-            font-size: 0.95rem;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-        
-        body.light-mode .data-table td {
-            color: var(--text-light);
-            border-bottom: 1px solid var(--border-light);
-        }
-        
-        .data-table tbody tr {
-            background: rgba(255, 255, 255, 0.02);
-            transition: all 0.3s ease;
-        }
-        
-        .data-table tbody tr:nth-child(even) {
-            background: rgba(255, 255, 255, 0.05);
-        }
-        
-        body.light-mode .data-table tbody tr {
-            background: rgba(0, 0, 0, 0.02);
-        }
-        
-        body.light-mode .data-table tbody tr:nth-child(even) {
-            background: rgba(0, 0, 0, 0.05);
-        }
-        
-        .data-table tbody tr:hover {
-            background: rgba(79, 70, 229, 0.1);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-        }
-        
-        .data-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-        
-        .sortable-header {
-            cursor: pointer;
-            user-select: none;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            transition: all 0.3s ease;
-        }
-        
-        .sortable-header:hover {
-            opacity: 0.9;
-        }
-        
-        .coleta-badge {
-            background: linear-gradient(135deg, var(--primary), var(--accent));
-            color: white;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            display: inline-block;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        
-        .price-cell {
-            font-weight: 700;
-            color: var(--primary) !important;
-            font-size: 1rem !important;
-        }
-        
-        .table-scroll {
-            overflow-x: auto;
-            max-height: 65vh;
-            scrollbar-width: thin;
-            scrollbar-color: var(--primary) transparent;
-        }
-        
-        .table-scroll::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        
-        .table-scroll::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        
-        .table-scroll::-webkit-scrollbar-thumb {
-            background: var(--primary);
-            border-radius: 4px;
-        }
-        
-        .table-scroll::-webkit-scrollbar-thumb:hover {
-            background: var(--accent);
-        }
-        
-        /* Animações */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .data-table tbody tr {
-            animation: fadeIn 0.5s ease forwards;
-        }
-        
-        .data-table tbody tr:nth-child(1) { animation-delay: 0.05s; }
-        .data-table tbody tr:nth-child(2) { animation-delay: 0.1s; }
-        .data-table tbody tr:nth-child(3) { animation-delay: 0.15s; }
-        .data-table tbody tr:nth-child(4) { animation-delay: 0.2s; }
-        .data-table tbody tr:nth-child(5) { animation-delay: 0.25s; }
-        .data-table tbody tr:nth-child(6) { animation-delay: 0.3s; }
-        .data-table tbody tr:nth-child(7) { animation-delay: 0.35s; }
-        .data-table tbody tr:nth-child(8) { animation-delay: 0.4s; }
-        .data-table tbody tr:nth-child(9) { animation-delay: 0.45s; }
-        .data-table tbody tr:nth-child(10) { animation-delay: 0.5s; }
-        
-        /* Responsividade */
-        @media (max-width: 1024px) {
-            .table-container {
-                border-radius: 10px;
-            }
-            
-            .data-table th,
-            .data-table td {
-                padding: 14px 16px;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .table-scroll {
-                max-height: 60vh;
-            }
-            
-            .data-table {
-                min-width: 700px;
-            }
-            
-            .data-table th,
-            .data-table td {
-                padding: 12px 14px;
-                font-size: 0.9rem;
-            }
-            
-            .price-cell {
-                font-size: 0.95rem !important;
-            }
-        }
-        
-        /* Indicador de ordenação */
-        .sort-indicator {
-            margin-left: 5px;
-            font-size: 0.8rem;
-            transition: transform 0.3s ease;
-        }
-        
-        .sort-asc .sort-indicator {
-            transform: rotate(180deg);
-        }
-        
-        /* Efeito de brilho nas linhas */
-        .data-table tbody tr::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(79, 70, 229, 0.05), transparent);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            pointer-events: none;
-        }
-        
-        .data-table tbody tr:hover::before {
-            opacity: 1;
-        }
-        
-        /* Estilo para células vazias */
-        .empty-cell {
-            color: var(--muted-dark) !important;
-            font-style: italic;
-        }
-        
-        body.light-mode .empty-cell {
-            color: var(--muted-light) !important;
-        }
-    </style>
 </head>
 <body class="theme-dark">
     <script>routeGuard('product_log');</script>
@@ -522,36 +97,53 @@
                     </div>
                     
                     <div class="filters-container">
-                        <div class="filter-group">
-                            <label for="searchInput"><i class="fas fa-search"></i> Buscar produto</label>
-                            <div class="search-input-group">
-                                <i class="fas fa-search"></i>
-                                <input type="text" id="searchInput" placeholder="Digite o nome do produto...">
+                        <div class="filters-header">
+                            <div class="filters-title">
+                                <i class="fas fa-filter"></i>
+                                <span>Filtros</span>
+                            </div>
+                            <div class="filters-actions">
+                                <button id="clearFiltersBtn" class="btn outline small"><i class="fas fa-times"></i> Limpar Filtros</button>
+                                <button id="applyFiltersBtn" class="btn small"><i class="fas fa-check"></i> Aplicar</button>
                             </div>
                         </div>
                         
-                        <div class="filter-group">
-                            <label for="supermarketFilter"><i class="fas fa-store"></i> Filtrar por supermercado</label>
-                            <select id="supermarketFilter">
-                                <option value="">Todos os supermercados</option>
-                                <!-- Opções serão preenchidas via JavaScript -->
-                            </select>
+                        <div class="filters-grid">
+                            <div class="filter-group">
+                                <label for="searchInput"><i class="fas fa-search"></i> Buscar produto</label>
+                                <div class="search-input-group">
+                                    <i class="fas fa-search"></i>
+                                    <input type="text" id="searchInput" placeholder="Digite o nome do produto...">
+                                </div>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <label for="supermarketFilter"><i class="fas fa-store"></i> Filtrar por supermercado</label>
+                                <select id="supermarketFilter">
+                                    <option value="">Todos os supermercados</option>
+                                    <!-- Opções serão preenchidas via JavaScript -->
+                                </select>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <label for="dateFilter"><i class="fas fa-calendar"></i> Filtrar por data</label>
+                                <input type="date" id="dateFilter">
+                            </div>
+                            
+                            <div class="filter-group">
+                                <label for="priceRange"><i class="fas fa-tag"></i> Faixa de preço</label>
+                                <select id="priceRange">
+                                    <option value="">Todos os preços</option>
+                                    <option value="0-10">Até R$ 10,00</option>
+                                    <option value="10-50">R$ 10,00 a R$ 50,00</option>
+                                    <option value="50-100">R$ 50,00 a R$ 100,00</option>
+                                    <option value="100-9999">Acima de R$ 100,00</option>
+                                </select>
+                            </div>
                         </div>
                         
-                        <div class="filter-group">
-                            <label for="dateFilter"><i class="fas fa-calendar"></i> Filtrar por data</label>
-                            <input type="date" id="dateFilter">
-                        </div>
-                        
-                        <div class="filter-group">
-                            <label for="priceRange"><i class="fas fa-tag"></i> Faixa de preço</label>
-                            <select id="priceRange">
-                                <option value="">Todos os preços</option>
-                                <option value="0-10">Até R$ 10,00</option>
-                                <option value="10-50">R$ 10,00 a R$ 50,00</option>
-                                <option value="50-100">R$ 50,00 a R$ 100,00</option>
-                                <option value="100-9999">Acima de R$ 100,00</option>
-                            </select>
+                        <div class="active-filters" id="activeFilters">
+                            <!-- Filtros ativos serão exibidos aqui -->
                         </div>
                     </div>
                     
@@ -617,7 +209,7 @@
                         </div>
                     </div>
                     
-                    <div class="card-view" style="display: none;">
+                    <div class="card-view">
                         <div class="products-grid" id="productsGrid">
                             <!-- Cards serão preenchidos via JavaScript -->
                         </div>
@@ -641,76 +233,8 @@
         </div>
     </div>
     <script src="mobile-menu.js"></script>
+     <script src="user-menu.js"></script>
     <script src="product-log.js"></script>
-    <script>
-        // Script adicional para funcionalidades de UI
-        document.addEventListener('DOMContentLoaded', () => {
-            // Alternar entre visualização de tabela e cards
-            const tableViewBtn = document.getElementById('tableViewBtn');
-            const cardViewBtn = document.getElementById('cardViewBtn');
-            const tableView = document.querySelector('.table-view');
-            const cardView = document.querySelector('.card-view');
-            
-            tableViewBtn.addEventListener('click', () => {
-                tableView.style.display = 'block';
-                cardView.style.display = 'none';
-                tableViewBtn.classList.add('active');
-                cardViewBtn.classList.remove('active');
-            });
-            
-            cardViewBtn.addEventListener('click', () => {
-                tableView.style.display = 'none';
-                cardView.style.display = 'block';
-                tableViewBtn.classList.remove('active');
-                cardViewBtn.classList.add('active');
-            });
-            
-            // Alternador de tema
-            const themeToggle = document.getElementById('themeToggle');
-            themeToggle.addEventListener('click', () => {
-                document.body.classList.toggle('light-mode');
-                const icon = themeToggle.querySelector('i');
-                if (document.body.classList.contains('light-mode')) {
-                    icon.className = 'fas fa-sun';
-                    localStorage.setItem('theme', 'light');
-                } else {
-                    icon.className = 'fas fa-moon';
-                    localStorage.setItem('theme', 'dark');
-                }
-            });
-            
-            // Verificar tema salvo
-            if (localStorage.getItem('theme') === 'light') {
-                document.body.classList.add('light-mode');
-                themeToggle.querySelector('i').className = 'fas fa-sun';
-            }
-            
-            // Adicionar efeito de ordenação visual
-            const sortableHeaders = document.querySelectorAll('.sortable-header');
-            sortableHeaders.forEach(header => {
-                header.addEventListener('click', () => {
-                    const column = header.dataset.sort;
-                    const indicator = header.querySelector('.sort-indicator');
-                    
-                    // Resetar todos os indicadores
-                    document.querySelectorAll('.sort-indicator').forEach(ind => {
-                        ind.className = 'fas fa-sort sort-indicator';
-                    });
-                    
-                    // Alternar entre ascendente e descendente
-                    if (indicator.classList.contains('fa-sort-up')) {
-                        indicator.className = 'fas fa-sort-down sort-indicator';
-                    } else if (indicator.classList.contains('fa-sort-down')) {
-                        indicator.className = 'fas fa-sort sort-indicator';
-                    } else {
-                        indicator.className = 'fas fa-sort-up sort-indicator';
-                    }
-                    
-                    // Aqui você implementaria a lógica de ordenação real
-                    console.log('Ordenar por:', column);
-                });
-            });
-        });
-    </script>
+    <script src="product-log-ui.js"></script>
 </body>
 </html>
