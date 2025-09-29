@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: api-precos
+    env: python
+    plan: free # Mude para 'starter' para evitar que o serviço durma após inatividade
+    
+    # COMANDO DE BUILD CORRIGIDO para resolver o erro "Read-only file system"
+    buildCommand: "export CARGO_HOME=/tmp/.cargo && pip install -r requirements.txt"
+    
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    
+    envVars:
+      - key: PYTHON_VERSION
+        # VERSÃO DO PYTHON CORRIGIDA para resolver o erro de incompatibilidade
+        value: 3.12.4
+      - fromGroup: api-precos-keys # Nome do grupo de variáveis de ambiente
+        
+    routes:
+      # Regra para garantir que a API seja roteada corretamente
+      - type: rewrite
+        source: /api/:path*
+        destination: /api/:path*
+      # Regra para servir os arquivos estáticos do frontend
+      - type: rewrite
+        source: /:path*
+        destination: /:path*
+
