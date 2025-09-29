@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('🔧 Inicializando UserMenu...');
             await this.loadUserInfo();
             this.setupEventListeners();
-            this.ensureMenuVisibility(); // Garantir menu sempre visível
         }
 
         async loadUserInfo() {
@@ -24,13 +23,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.showLoadingState();
                 console.log('📡 Buscando dados do usuário...');
                 
-                const userData = await this.fetchUserData();
-                console.log('✅ Dados recebidos:', userData);
+                // Usa a função fetchUserProfile do auth.js que já está funcionando
+                const userData = await this.fetchRealUserData();
                 
                 if (userData) {
                     this.updateUI(userData);
+                    console.log('✅ Dados reais carregados:', userData);
                 } else {
-                    console.log('❌ Nenhum dado recebido');
+                    console.log('❌ Nenhum dado de usuário encontrado');
                     this.handleNoUserData();
                 }
                 
@@ -40,88 +40,58 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        async fetchUserData() {
+        async fetchRealUserData() {
             try {
-                console.log('🌐 Chamando API /api/user/me...');
-                const response = await authenticatedFetch('/api/user/me', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
+                console.log('🌐 Buscando dados reais do usuário...');
+                
+                // Método 1: Tenta usar a função fetchUserProfile do auth.js
+                if (typeof fetchUserProfile === 'function') {
+                    console.log('📚 Usando fetchUserProfile do auth.js');
+                    const profile = await fetchUserProfile();
+                    if (profile) {
+                        return {
+                            name: profile.full_name,
+                            email: profile.email,
+                            role: profile.role,
+                            avatar: profile.avatar_url,
+                            permissions: profile.allowed_pages || []
+                        };
                     }
-                });
-
-                console.log('📨 Status da resposta:', response.status);
+                }
+                
+                // Método 2: Se não encontrar a função, faz a requisição diretamente
+                console.log('🔧 Fazendo requisição direta para /api/users/me');
+                const response = await authenticatedFetch('/api/users/me');
                 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                const userData = await response.json();
-                console.log('📊 Dados da API:', userData);
-                return userData;
-                
-            } catch (error) {
-                console.error('❌ Erro na API, usando fallback:', error);
-                return await this.getFallbackUserData();
-            }
-        }
-
-        async getFallbackUserData() {
-            try {
-                console.log('🔄 Tentando fallback...');
-                
-                // 1. Tentar do localStorage
-                const storedUser = localStorage.getItem('currentUser');
-                if (storedUser) {
-                    console.log('📦 Usuário do localStorage:', storedUser);
-                    return JSON.parse(storedUser);
-                }
-                
-                // 2. Tentar do token Supabase
-                const token = localStorage.getItem('supabase.auth.token');
-                if (token) {
-                    console.log('🔑 Token encontrado, extraindo dados...');
-                    try {
-                        const parsedToken = JSON.parse(token);
-                        if (parsedToken?.access_token) {
-                            const payload = JSON.parse(atob(parsedToken.access_token.split('.')[1]));
-                            console.log('📋 Payload do token:', payload);
-                            
-                            const userData = {
-                                id: payload.sub,
-                                email: payload.email,
-                                name: payload.user_metadata?.name || payload.email?.split('@')[0] || 'Usuário Teste',
-                                role: payload.user_metadata?.role || 'user',
-                                avatar: payload.user_metadata?.avatar_url || null,
-                                permissions: ['search', 'compare', 'dashboard']
-                            };
-                            
-                            console.log('👤 Dados do token:', userData);
-                            return userData;
-                        }
-                    } catch (tokenError) {
-                        console.error('❌ Erro ao decodificar token:', tokenError);
-                    }
-                }
-                
-                // 3. Fallback final com dados de exemplo
-                console.log('🎭 Usando dados de exemplo');
+                const profile = await response.json();
                 return {
-                    name: 'João Silva',
-                    email: 'joao@empresa.com',
-                    role: 'admin', // Mudar para 'user' para testar diferentes níveis
-                    avatar: null,
-                    permissions: ['search', 'compare', 'dashboard', 'coleta', 'collections', 'markets', 'users']
+                    name: profile.full_name,
+                    email: profile.email,
+                    role: profile.role,
+                    avatar: profile.avatar_url,
+                    permissions: profile.allowed_pages || []
                 };
                 
             } catch (error) {
-                console.error('❌ Erro no fallback:', error);
+                console.error('❌ Erro ao buscar dados reais:', error);
+                
+                // Método 3: Tenta dados do localStorage como último recurso
+                const storedUser = localStorage.getItem('currentUser');
+                if (storedUser) {
+                    console.log('📦 Usando dados do localStorage');
+                    return JSON.parse(storedUser);
+                }
+                
                 return null;
             }
         }
 
         updateUI(userData) {
-            console.log('🎨 Atualizando UI com:', userData);
+            console.log('🎨 Atualizando UI com dados reais:', userData);
             
             // Nome do usuário
             if (this.userName) {
@@ -157,20 +127,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('🖼️ Avatar definido');
             }
 
-            // Salvar dados para uso futuro
+            // Salvar dados reais para uso futuro
             localStorage.setItem('currentUser', JSON.stringify(userData));
             
             // Remover estado de loading
             this.hideLoadingState();
             
-            console.log('✅ UI atualizada com sucesso');
+            console.log('✅ UI atualizada com dados reais');
         }
 
         setDefaultAvatar(userData) {
             const name = userData.name || userData.email || 'U';
             const backgroundColor = userData.role === 'admin' ? 'ef4444' : '4f46e5';
             this.userAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${backgroundColor}&color=fff&size=128&bold=true`;
-            console.log('🖼️ Avatar padrão gerado');
+            console.log('🖼️ Avatar padrão gerado para:', name);
         }
 
         getRoleDisplayText(role) {
@@ -182,18 +152,6 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             
             return roleMap[role] || 'Usuário';
-        }
-
-        ensureMenuVisibility() {
-            console.log('👁️ Garantindo visibilidade do menu...');
-            
-            // Garantir que todos os itens do menu estejam visíveis
-            const allMenuItems = document.querySelectorAll('.sidebar-nav li');
-            allMenuItems.forEach(item => {
-                item.style.display = 'flex';
-            });
-            
-            console.log('✅ Menu garantido como visível');
         }
 
         setupEventListeners() {
@@ -256,12 +214,14 @@ document.addEventListener('DOMContentLoaded', function() {
         async handleLogout() {
             if (confirm('Tem certeza que deseja sair?')) {
                 try {
-                    await this.performLogout();
-                    this.showNotification('Logout realizado com sucesso', 'success');
+                    // Usa a função signOut do auth.js que já está funcionando
+                    if (typeof signOut === 'function') {
+                        await signOut();
+                    } else {
+                        await this.performLogout();
+                    }
                     
-                    setTimeout(() => {
-                        window.location.href = '/login.html';
-                    }, 1500);
+                    this.showNotification('Logout realizado com sucesso', 'success');
                     
                 } catch (error) {
                     console.error('Erro ao fazer logout:', error);
@@ -273,10 +233,7 @@ document.addEventListener('DOMContentLoaded', function() {
         async performLogout() {
             try {
                 const response = await authenticatedFetch('/api/auth/logout', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
+                    method: 'POST'
                 });
                 this.clearLocalData();
                 
@@ -308,7 +265,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (this.userName) this.userName.textContent = 'Erro ao carregar';
             if (this.userRole) this.userRole.textContent = '---';
             this.setDefaultAvatar({ name: 'Erro', role: 'user' });
-            this.ensureMenuVisibility();
             console.log('❌ Estado de erro mostrado');
         }
 
@@ -316,7 +272,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (this.userName) this.userName.textContent = 'Usuário Não Logado';
             if (this.userRole) this.userRole.textContent = '---';
             this.showNotification('Usuário não autenticado', 'warning');
-            this.ensureMenuVisibility();
             
             setTimeout(() => {
                 window.location.href = '/login.html';
@@ -351,7 +306,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Inicializar
-    console.log('🚀 Iniciando UserMenu...');
-    new UserMenu();
+    // Inicializar apenas se os elementos existirem
+    if (document.getElementById('userMenuBtn')) {
+        console.log('🚀 Iniciando UserMenu...');
+        new UserMenu();
+    } else {
+        console.log('⏭️ UserMenu não inicializado - elementos não encontrados');
+    }
 });
