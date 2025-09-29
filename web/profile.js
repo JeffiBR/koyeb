@@ -14,17 +14,25 @@ document.addEventListener('DOMContentLoaded', () => {
      * Função auxiliar para extrair mensagens de erro de forma legível
      */
     const getErrorMessage = (error) => {
+        console.log('Error object received:', error);
+        
         if (typeof error === 'string') return error;
         if (error?.message) return error.message;
-        if (error?.error) return error.error;
+        if (error?.error) return getErrorMessage(error.error);
         if (error?.detail) return error.detail;
         if (error?.msg) return error.msg;
         
-        // Para erros do Supabase
-        if (error?.name === 'AuthApiError') return 'Erro de autenticação';
-        if (error?.statusCode) return `Erro ${error.statusCode}: ${error.message}`;
+        // Para erros de validação 422
+        if (error?.errors) {
+            return Object.values(error.errors).join(', ');
+        }
         
-        return 'Erro desconhecido';
+        // Para arrays de erro
+        if (Array.isArray(error)) {
+            return error.map(err => getErrorMessage(err)).join(', ');
+        }
+        
+        return JSON.stringify(error);
     };
 
     /**
@@ -65,7 +73,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Atualiza a imagem do avatar
             if (currentUserProfile.avatar_url && userAvatar) {
                 userAvatar.src = currentUserProfile.avatar_url;
-                // Adiciona tratamento de erro para imagem quebrada
                 userAvatar.onerror = () => {
                     userAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUserProfile.full_name || currentSession.user.email || 'U')}`;
                 };
@@ -106,8 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             console.log('Perfil inicial criado com sucesso');
-            
-            // Recarrega o perfil após criação
             await loadProfile();
             
         } catch (error) {
@@ -152,7 +157,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 console.log('Fazendo upload do arquivo:', filePath);
 
-                // Faz o upload do arquivo
                 const { data: uploadData, error: uploadError } = await supabase
                     .storage
                     .from('avatars')
@@ -166,7 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(`Falha no upload: ${getErrorMessage(uploadError)}`);
                 }
 
-                // Obtém a URL pública
                 const { data: urlData } = supabase
                     .storage
                     .from('avatars')
@@ -177,21 +180,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 uploadStatus.textContent = 'Foto enviada com sucesso!';
             }
 
-            // 2. Prepara dados para atualização
-            const updateData = {
-                full_name: fullNameInput.value.trim() || null,
-                job_title: jobTitleInput.value.trim() || null,
-                avatar_url: avatarUrl || null
-            };
+            // 2. Prepara dados para atualização - EVITA campos null
+            const updateData = {};
+            
+            // Só inclui campos que têm valores
+            const fullName = fullNameInput.value.trim();
+            const jobTitle = jobTitleInput.value.trim();
+            
+            if (fullName) updateData.full_name = fullName;
+            if (jobTitle) updateData.job_title = jobTitle;
+            if (avatarUrl) updateData.avatar_url = avatarUrl;
 
-            // Remove campos vazios
-            Object.keys(updateData).forEach(key => {
-                if (updateData[key] === null || updateData[key] === '') {
-                    delete updateData[key];
-                }
-            });
+            console.log('Dados para atualização:', updateData);
 
-            console.log('Enviando dados para atualização:', updateData);
+            // Verifica se há dados para atualizar
+            if (Object.keys(updateData).length === 0) {
+                uploadStatus.textContent = 'Nenhuma alteração para salvar.';
+                uploadStatus.style.color = 'var(--warning)';
+                return;
+            }
 
             // 3. Atualiza o perfil
             const response = await authenticatedFetch('/api/users/me', {
@@ -202,20 +209,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(updateData)
             });
 
+            console.log('Resposta da API:', {
+                status: response.status,
+                statusText: response.statusText,
+                ok: response.ok
+            });
+
             if (!response.ok) {
-                const errorData = await response.json().catch(() => null);
+                let errorData;
+                try {
+                    errorData = await response.json();
+                    console.log('Dados do erro 422:', errorData);
+                } catch (parseError) {
+                    errorData = { detail: `Erro ${response.status}: ${response.statusText}` };
+                }
+                
+                // Tratamento específico para erro 422
+                if (response.status === 422) {
+                    const validationErrors = errorData.detail || errorData.message || JSON.stringify(errorData);
+                    throw new Error(`Dados inválidos: ${validationErrors}`);
+                }
+                
                 throw new Error(getErrorMessage(errorData) || `Erro ${response.status}: Falha ao atualizar perfil`);
             }
 
             const updatedProfile = await response.json();
-            console.log('Perfil atualizado:', updatedProfile);
+            console.log('Perfil atualizado com sucesso:', updatedProfile);
 
             uploadStatus.textContent = 'Perfil atualizado com sucesso!';
             uploadStatus.style.color = 'var(--success)';
             
             // Atualiza a foto no menu
             if (userAvatar && avatarUrl) {
-                userAvatar.src = avatarUrl + '?t=' + Date.now(); // Adiciona timestamp para evitar cache
+                userAvatar.src = avatarUrl + '?t=' + Date.now();
             }
 
             // Atualiza os dados locais
