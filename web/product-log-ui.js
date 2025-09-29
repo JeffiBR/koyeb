@@ -1,7 +1,7 @@
-// ====== FUNÇÕES DE UI PARA PRODUCT-LOG ======
-
+// product-log-ui.js - Gerenciamento da interface do usuário
 class ProductLogUI {
     constructor() {
+        this.searchTimeout = null;
         this.init();
     }
 
@@ -10,6 +10,7 @@ class ProductLogUI {
         this.setupTheme();
         this.setupViewToggle();
         this.setupFilters();
+        this.setupExportButton();
     }
 
     setupEventListeners() {
@@ -21,9 +22,6 @@ class ProductLogUI {
 
         // Ordenação das colunas
         this.setupSorting();
-
-        // Filtros
-        this.setupFilterEvents();
     }
 
     setupTheme() {
@@ -57,7 +55,7 @@ class ProductLogUI {
         const tableView = document.querySelector('.table-view');
         const cardView = document.querySelector('.card-view');
 
-        if (tableViewBtn && cardViewBtn) {
+        if (tableViewBtn && cardViewBtn && tableView && cardView) {
             tableViewBtn.addEventListener('click', () => {
                 tableView.style.display = 'block';
                 cardView.style.display = 'none';
@@ -90,16 +88,16 @@ class ProductLogUI {
         const tableView = document.querySelector('.table-view');
         const cardView = document.querySelector('.card-view');
 
-        if (savedView === 'card') {
+        if (savedView === 'card' && tableView && cardView) {
             tableView.style.display = 'none';
             cardView.style.display = 'block';
-            tableViewBtn.classList.remove('active');
-            cardViewBtn.classList.add('active');
-        } else {
+            if (tableViewBtn) tableViewBtn.classList.remove('active');
+            if (cardViewBtn) cardViewBtn.classList.add('active');
+        } else if (tableView && cardView) {
             tableView.style.display = 'block';
             cardView.style.display = 'none';
-            tableViewBtn.classList.add('active');
-            cardViewBtn.classList.remove('active');
+            if (tableViewBtn) tableViewBtn.classList.add('active');
+            if (cardViewBtn) cardViewBtn.classList.remove('active');
         }
     }
 
@@ -128,9 +126,12 @@ class ProductLogUI {
                     direction = 'asc';
                 }
                 
-                // Chamar função de ordenação se existir
-                if (window.productLogManager && direction !== 'none') {
-                    window.productLogManager.sortProducts(column, direction);
+                // Chamar função de ordenação se existir no product-log.js
+                if (window.currentSort && direction !== 'none') {
+                    window.currentSort = { column: column, direction: direction };
+                    if (window.fetchLogs) {
+                        window.fetchLogs(window.currentPage || 1);
+                    }
                 }
             });
         });
@@ -152,14 +153,11 @@ class ProductLogUI {
         // Busca em tempo real com debounce
         const searchInput = document.getElementById('searchInput');
         if (searchInput) {
-            let searchTimeout;
             searchInput.addEventListener('input', () => {
-                clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(() => {
+                clearTimeout(this.searchTimeout);
+                this.searchTimeout = setTimeout(() => {
                     this.updateActiveFilters();
-                    if (window.productLogManager) {
-                        window.productLogManager.fetchLogs(1);
-                    }
+                    this.applyFilters();
                 }, 500);
             });
         }
@@ -171,54 +169,70 @@ class ProductLogUI {
             if (filter) {
                 filter.addEventListener('change', () => {
                     this.updateActiveFilters();
-                    if (window.productLogManager) {
-                        window.productLogManager.fetchLogs(1);
-                    }
+                    this.applyFilters();
                 });
             }
         });
+
+        // Inicializar filtros ativos
+        this.updateActiveFilters();
+    }
+
+    setupExportButton() {
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => this.exportData());
+        }
     }
 
     clearFilters() {
-        document.getElementById('searchInput').value = '';
-        document.getElementById('supermarketFilter').value = '';
-        document.getElementById('dateFilter').value = '';
-        document.getElementById('priceRange').value = '';
+        // Limpar inputs
+        const searchInput = document.getElementById('searchInput');
+        const supermarketFilter = document.getElementById('supermarketFilter');
+        const dateFilter = document.getElementById('dateFilter');
+        const priceRange = document.getElementById('priceRange');
+
+        if (searchInput) searchInput.value = '';
+        if (supermarketFilter) supermarketFilter.value = '';
+        if (dateFilter) dateFilter.value = '';
+        if (priceRange) priceRange.value = '';
         
         // Limpar filtros ativos
         this.clearActiveFilters();
         
         // Recarregar dados
-        if (window.productLogManager) {
-            window.productLogManager.fetchLogs(1);
-        }
+        this.applyFilters();
     }
 
     applyFilters() {
-        // Atualizar filtros ativos
-        this.updateActiveFilters();
+        // Resetar para primeira página
+        if (window.currentPage) {
+            window.currentPage = 1;
+        }
         
-        // Recarregar dados
-        if (window.productLogManager) {
-            window.productLogManager.fetchLogs(1);
+        // Recarregar dados usando a função existente do product-log.js
+        if (window.fetchLogs) {
+            window.fetchLogs(window.currentPage || 1);
         }
     }
 
     updateActiveFilters() {
         const activeFilters = document.getElementById('activeFilters');
+        if (!activeFilters) return;
+        
         activeFilters.innerHTML = '';
         
-        const searchValue = document.getElementById('searchInput').value;
-        const supermarketValue = document.getElementById('supermarketFilter').value;
-        const dateValue = document.getElementById('dateFilter').value;
-        const priceValue = document.getElementById('priceRange').value;
+        const searchValue = document.getElementById('searchInput')?.value.trim();
+        const supermarketValue = document.getElementById('supermarketFilter')?.value;
+        const dateValue = document.getElementById('dateFilter')?.value;
+        const priceValue = document.getElementById('priceRange')?.value;
         
         if (searchValue) {
             this.addActiveFilter('Busca', searchValue, 'searchInput');
         }
         
         if (supermarketValue) {
-            const supermarketText = document.getElementById('supermarketFilter').options[document.getElementById('supermarketFilter').selectedIndex].text;
+            const supermarketText = document.getElementById('supermarketFilter')?.options[document.getElementById('supermarketFilter').selectedIndex]?.text || supermarketValue;
             this.addActiveFilter('Supermercado', supermarketText, 'supermarketFilter');
         }
         
@@ -227,13 +241,15 @@ class ProductLogUI {
         }
         
         if (priceValue) {
-            const priceText = document.getElementById('priceRange').options[document.getElementById('priceRange').selectedIndex].text;
+            const priceText = document.getElementById('priceRange')?.options[document.getElementById('priceRange').selectedIndex]?.text || priceValue;
             this.addActiveFilter('Faixa de Preço', priceText, 'priceRange');
         }
     }
 
     addActiveFilter(label, value, filterId) {
         const activeFilters = document.getElementById('activeFilters');
+        if (!activeFilters) return;
+
         const filterElement = document.createElement('div');
         filterElement.className = 'active-filter';
         filterElement.innerHTML = `
@@ -248,13 +264,14 @@ class ProductLogUI {
         const removeBtn = filterElement.querySelector('.remove-filter');
         removeBtn.addEventListener('click', () => {
             const filterToRemove = removeBtn.getAttribute('data-filter');
-            document.getElementById(filterToRemove).value = '';
-            filterElement.remove();
+            const filterElement = document.getElementById(filterToRemove);
+            if (filterElement) {
+                filterElement.value = '';
+            }
+            filterElement.parentElement.remove();
             
             // Recarregar dados
-            if (window.productLogManager) {
-                window.productLogManager.fetchLogs(1);
-            }
+            this.applyFilters();
             
             // Atualizar filtros ativos
             this.updateActiveFilters();
@@ -263,56 +280,164 @@ class ProductLogUI {
 
     clearActiveFilters() {
         const activeFilters = document.getElementById('activeFilters');
-        activeFilters.innerHTML = '';
-    }
-
-    // Métodos para atualizar a UI
-    showLoading() {
-        const tableBody = document.querySelector('#productsTable tbody');
-        const productsGrid = document.getElementById('productsGrid');
-        
-        if (tableBody) {
-            tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center;"><div class="loader"></div></td></tr>`;
-        }
-        
-        if (productsGrid) {
-            productsGrid.innerHTML = '<div class="loader-container"><div class="loader"></div><p>Carregando produtos...</p></div>';
+        if (activeFilters) {
+            activeFilters.innerHTML = '';
         }
     }
 
-    showError(message) {
-        const tableBody = document.querySelector('#productsTable tbody');
-        const productsGrid = document.getElementById('productsGrid');
-        
-        if (tableBody) {
-            tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center;">${message}</td></tr>`;
-        }
-        
-        if (productsGrid) {
-            productsGrid.innerHTML = `<div class="empty-state">${message}</div>`;
+    async exportData() {
+        try {
+            const session = await getSession();
+            if (!session) return;
+
+            // Construir parâmetros de filtro atuais
+            const params = new URLSearchParams();
+            
+            // Adicionar parâmetros atuais (simulando o que o product-log.js faz)
+            const searchValue = document.getElementById('searchInput')?.value.trim();
+            const supermarketValue = document.getElementById('supermarketFilter')?.value;
+            const dateValue = document.getElementById('dateFilter')?.value;
+            const priceValue = document.getElementById('priceRange')?.value;
+
+            if (searchValue) params.append('search', searchValue);
+            if (supermarketValue) params.append('supermarket', supermarketValue);
+            if (dateValue) params.append('date', dateValue);
+            if (priceValue) params.append('price_range', priceValue);
+
+            // Usar a mesma URL da API
+            const response = await fetch(`/api/products-log/export?${params}`, {
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`
+                }
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `produtos_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                this.showNotification('Exportação realizada com sucesso!', 'success');
+            } else {
+                throw new Error('Falha ao exportar dados');
+            }
+        } catch (error) {
+            console.error('Erro ao exportar dados:', error);
+            this.showNotification('Erro ao exportar dados', 'error');
         }
     }
 
-    updatePagination(totalCount, currentPage, pageSize) {
-        const totalPages = Math.ceil(totalCount / pageSize);
+    showNotification(message, type = 'info') {
+        // Criar elemento de notificação
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info'}"></i>
+            <span>${message}</span>
+        `;
         
-        // Atualizar informações da página
-        const pageInfoElements = document.querySelectorAll('.page-info');
-        pageInfoElements.forEach(element => {
-            element.textContent = `Página ${currentPage} de ${totalPages > 0 ? totalPages : 1}`;
-        });
+        // Adicionar estilos se não existirem
+        if (!document.querySelector('#notification-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'notification-styles';
+            styles.textContent = `
+                .notification {
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 1rem 1.5rem;
+                    border-radius: 12px;
+                    color: white;
+                    font-weight: 600;
+                    z-index: 10000;
+                    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+                    transform: translateX(100%);
+                    opacity: 0;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    max-width: 400px;
+                }
+                .notification.show {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                .notification.success {
+                    background: linear-gradient(135deg, #10b981, #34d399);
+                }
+                .notification.error {
+                    background: linear-gradient(135deg, #ef4444, #f87171);
+                }
+                .notification.info {
+                    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+                }
+            `;
+            document.head.appendChild(styles);
+        }
         
-        // Atualizar botões de paginação
-        const prevButtons = document.querySelectorAll('#prevPageBtn, #prevPageBtnCard');
-        const nextButtons = document.querySelectorAll('#nextPageBtn, #nextPageBtnCard');
+        document.body.appendChild(notification);
         
-        prevButtons.forEach(btn => {
-            btn.disabled = currentPage <= 1;
-        });
+        // Mostrar notificação
+        setTimeout(() => notification.classList.add('show'), 100);
         
-        nextButtons.forEach(btn => {
-            btn.disabled = currentPage >= totalPages;
-        });
+        // Remover após 3 segundos
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 3000);
+    }
+
+    // Método para integrar com o product-log.js existente
+    integrateWithExistingCode() {
+        // Sobrescrever a função fetchLogs para incluir nossos filtros
+        const originalFetchLogs = window.fetchLogs;
         
-        // Atualizar total de itens
-        const totalItems
+        if (originalFetchLogs) {
+            window.fetchLogs = async (page) => {
+                // Chamar a função original mas com nossos filtros
+                if (typeof originalFetchLogs === 'function') {
+                    await originalFetchLogs(page);
+                }
+            };
+        }
+    }
+}
+
+// Inicialização quando o DOM estiver carregado
+document.addEventListener('DOMContentLoaded', () => {
+    // Aguardar um pouco para garantir que o product-log.js tenha carregado
+    setTimeout(() => {
+        window.productLogUI = new ProductLogUI();
+        
+        // Tentar integrar com o código existente
+        window.productLogUI.integrateWithExistingCode();
+    }, 100);
+});
+
+// Função auxiliar para obter parâmetros de filtro atuais
+function getCurrentFilterParams() {
+    const params = new URLSearchParams();
+    
+    const searchValue = document.getElementById('searchInput')?.value.trim();
+    const supermarketValue = document.getElementById('supermarketFilter')?.value;
+    const dateValue = document.getElementById('dateFilter')?.value;
+    const priceValue = document.getElementById('priceRange')?.value;
+
+    if (searchValue) params.append('search', searchValue);
+    if (supermarketValue) params.append('supermarket', supermarketValue);
+    if (dateValue) params.append('date', dateValue);
+    if (priceValue) params.append('price_range', priceValue);
+    
+    return params;
+}
