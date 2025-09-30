@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Analítico - Preços AL</title>
+    <title>Dashboard Analítico</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="dashboard-enhanced.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="auth.js"></script>
     <script src="theme.js"></script>
@@ -91,14 +90,12 @@
                         <i class="fas fa-chart-line"></i>
                         <h2>Dashboard Analítico</h2>
                     </div>
-                    <p class="panel-description">Visualize métricas e insights sobre os dados coletados do sistema. Identifique os melhores preços por categoria.</p>
+                    <p class="panel-description">Visualize métricas e insights sobre os dados coletados do sistema.</p>
                     
                     <div class="filter-bar">
                         <div class="form-group">
-                            <label>Supermercados</label>
-                            <div id="marketFilters" class="supermarket-list-row">
-                                <!-- Filtros de mercado serão carregados dinamicamente -->
-                            </div>
+                            <label>Supermercados (Opcional)</label>
+                            <div id="marketFilters" class="supermarket-list-row"></div>
                         </div>
                         <div class="form-group">
                             <label for="startDate">Período De:</label>
@@ -115,93 +112,55 @@
 
                     <div class="summary-cards">
                         <div class="card">
-                            <div class="card-icon">
-                                <i class="fas fa-store"></i>
-                            </div>
-                            <div class="card-content">
-                                <h3>Mercados Ativos</h3>
-                                <p id="total-mercados">0</p>
-                            </div>
+                            <h3>Mercados</h3>
+                            <p id="total-mercados">...</p>
                         </div>
                         <div class="card">
-                            <div class="card-icon">
-                                <i class="fas fa-boxes"></i>
-                            </div>
-                            <div class="card-content">
-                                <h3>Produtos Coletados</h3>
-                                <p id="total-produtos">0</p>
-                            </div>
+                            <h3>Produtos Coletados</h3>
+                            <p id="total-produtos">...</p>
                         </div>
                         <div class="card">
-                            <div class="card-icon">
-                                <i class="fas fa-shopping-cart"></i>
-                            </div>
-                            <div class="card-content">
-                                <h3>Coletas Realizadas</h3>
-                                <p id="total-coletas">0</p>
-                            </div>
+                            <h3>Coletas Realizadas</h3>
+                            <p id="total-coletas">...</p>
                         </div>
                         <div class="card">
-                            <div class="card-icon">
-                                <i class="fas fa-clock"></i>
-                            </div>
-                            <div class="card-content">
-                                <h3>Última Coleta</h3>
-                                <p id="ultima-coleta">Nenhuma</p>
-                            </div>
+                            <h3>Última Coleta</h3>
+                            <p id="ultima-coleta">...</p>
                         </div>
                     </div>
 
                     <div class="dashboard-grid">
                         <div class="chart-container">
                             <div class="chart-header">
-                                <h2>Top 10 Produtos Mais Buscados</h2>
-                                <div class="chart-toggles" id="toggles-products">
-                                    <!-- Botões serão carregados dinamicamente -->
-                                </div>
+                                <h2>Top 10 Produtos Buscados</h2>
+                                <div class="chart-toggles" id="toggles-products"></div>
                             </div>
                             <canvas id="topProductsChart"></canvas>
                         </div>
                         <div class="chart-container">
                             <div class="chart-header">
-                                <h2>Top 10 Mercados Mais Selecionados</h2>
-                                <div class="chart-toggles" id="toggles-markets">
-                                    <!-- Botões serão carregados dinamicamente -->
-                                </div>
+                                <h2>Top 10 Mercados Selecionados</h2>
+                                <div class="chart-toggles" id="toggles-markets"></div>
                             </div>
                             <canvas id="topMarketsChart"></canvas>
                         </div>
                     </div>
 
                     <div class="table-container">
-                        <div class="table-header">
-                            <h2><i class="fas fa-tag"></i> Caça-Ofertas: Produtos Mais Baratos</h2>
-                            <p>Compara produtos idênticos e mostra onde encontrar o menor preço no período e mercados selecionados.</p>
-                        </div>
-                        
-                        <div class="category-filters">
-                            <!-- Filtros de categoria serão carregados dinamicamente -->
-                        </div>
-                        
-                        <div class="table-responsive">
-                            <table id="bargainsTable">
-                                <thead>
-                                    <tr>
-                                        <th>Produto</th>
-                                        <th>Menor Preço</th>
-                                        <th>Supermercado</th>
-                                        <th>Data da Venda</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <!-- Dados serão carregados dinamicamente -->
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <div class="table-footer">
-                            <p><i class="fas fa-info-circle"></i> Mostrando os 30 produtos mais baratos de cada categoria</p>
-                        </div>
+                        <h2>Caça-Ofertas: Produtos Mais Baratos</h2>
+                        <p>Compara produtos idênticos e mostra onde encontrar o menor preço no período e mercados selecionados.</p>
+                        <div class="category-filters"></div>
+                        <table id="bargainsTable">
+                            <thead>
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>Menor Preço</th>
+                                    <th>Supermercado</th>
+                                    <th>Data da Venda</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
                     </div>
                 </main>
             </div>
@@ -209,8 +168,10 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="dashboard-enhanced.js"></script>
-    <script src="mobile-menu.js"></script>
+    <script src="dashboard.js"></script>
+      <script src="mobile-menu.js"></script>
     <script src="user-menu.js"></script>
 </body>
 </html>
+
+
