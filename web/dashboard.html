@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Analítico</title>
+    <title>Dashboard Analítico - Preços AL</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -90,13 +90,35 @@
                         <i class="fas fa-chart-line"></i>
                         <h2>Dashboard Analítico</h2>
                     </div>
-                    <p class="panel-description">Visualize métricas e insights sobre os dados coletados do sistema.</p>
+                    <p class="panel-description">Visualize métricas e insights sobre os dados coletados do sistema. Acompanhe a evolução de preços e encontre as melhores ofertas.</p>
                     
+                    <!-- Filtros Melhorados -->
                     <div class="filter-bar">
                         <div class="form-group">
-                            <label>Supermercados (Opcional)</label>
-                            <div id="marketFilters" class="supermarket-list-row"></div>
+                            <label>Selecionar Supermercados</label>
+                            <div class="market-selection-panel">
+                                <div class="selection-header">
+                                    <span id="selectedMarketsCount">0 mercados selecionados</span>
+                                    <div class="selection-actions">
+                                        <button type="button" class="btn small outline" id="selectAllMarkets">
+                                            <i class="fas fa-check-double"></i> Selecionar Todos
+                                        </button>
+                                        <button type="button" class="btn small outline" id="clearSelection">
+                                            <i class="fas fa-times"></i> Limpar
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="market-search-box">
+                                    <i class="fas fa-search"></i>
+                                    <input type="text" id="marketSearch" placeholder="Buscar supermercados...">
+                                    <button class="clear-search" id="clearMarketSearch">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="markets-grid" id="marketFilters"></div>
+                            </div>
                         </div>
+                        
                         <div class="form-group">
                             <label for="startDate">Período De:</label>
                             <input type="date" id="startDate">
@@ -105,11 +127,12 @@
                             <label for="endDate">Até:</label>
                             <input type="date" id="endDate">
                         </div>
-                        <button id="applyFiltersBtn" class="btn">
+                        <button id="applyFiltersBtn" class="btn primary">
                             <i class="fas fa-filter"></i> Aplicar Filtros
                         </button>
                     </div>
 
+                    <!-- Cards de Resumo -->
                     <div class="summary-cards">
                         <div class="card">
                             <h3>Mercados</h3>
@@ -129,23 +152,45 @@
                         </div>
                     </div>
 
+                    <!-- Grid de Gráficos Melhorado -->
                     <div class="dashboard-grid">
+                        <div class="chart-container full-width">
+                            <div class="chart-header">
+                                <h2>Evolução de Preços por Produto</h2>
+                                <div class="product-selector">
+                                    <select id="productSelect">
+                                        <option value="">Selecione um produto...</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <canvas id="priceEvolutionChart"></canvas>
+                        </div>
+                        
                         <div class="chart-container">
                             <div class="chart-header">
-                                <h2>Top 10 Produtos Buscados</h2>
-                                <div class="chart-toggles" id="toggles-products"></div>
+                                <h2>Top 10 Produtos Mais Buscados</h2>
+                                <div class="chart-toggles" id="toggles-products">
+                                    <button data-chart="topProductsChart" data-type="bar" class="active">Barra</button>
+                                    <button data-chart="topProductsChart" data-type="pie">Pizza</button>
+                                    <button data-chart="topProductsChart" data-type="line">Linha</button>
+                                </div>
                             </div>
                             <canvas id="topProductsChart"></canvas>
                         </div>
+                        
                         <div class="chart-container">
                             <div class="chart-header">
-                                <h2>Top 10 Mercados Selecionados</h2>
-                                <div class="chart-toggles" id="toggles-markets"></div>
+                                <h2>Top 10 Mercados Mais Selecionados</h2>
+                                <div class="chart-toggles" id="toggles-markets">
+                                    <button data-chart="topMarketsChart" data-type="bar" class="active">Barra</button>
+                                    <button data-chart="topMarketsChart" data-type="pie">Pizza</button>
+                                </div>
                             </div>
                             <canvas id="topMarketsChart"></canvas>
                         </div>
                     </div>
 
+                    <!-- Tabela de Ofertas -->
                     <div class="table-container">
                         <h2>Caça-Ofertas: Produtos Mais Baratos</h2>
                         <p>Compara produtos idênticos e mostra onde encontrar o menor preço no período e mercados selecionados.</p>
@@ -168,6 +213,10 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
     <script src="dashboard.js"></script>
+    <script src="mobile-menu.js"></script>
+    <script src="user-menu.js"></script>
+    <script src="product-categories.js"></script>
 </body>
 </html>
