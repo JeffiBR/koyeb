@@ -1,0 +1,280 @@
+/* dashboard-enhanced.css */
+:root {
+    /* Cores principais */
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --secondary: #7c3aed;
+    --accent: #06d6a0;
+    
+    /* Cores do tema */
+    --bg-dark: #0f172a;
+    --card-dark: #1e293b;
+    --text-dark: #f1f5f9;
+    --border-dark: #334155;
+    --muted-dark: #94a3b8;
+    
+    --bg-light: #f8fafc;
+    --card-light: #ffffff;
+    --text-light: #1e293b;
+    --border-light: #e2e8f0;
+    --muted-light: #64748b;
+}
+
+/* Cartões de resumo aprimorados */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.summary-cards .card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.summary-cards .card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+}
+
+.summary-cards .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+}
+
+.card-content h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--muted-text);
+    margin-bottom: 0.5rem;
+}
+
+.card-content p {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin: 0;
+}
+
+/* Barra de filtros aprimorada */
+.filter-bar {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    border: 1px solid var(--border-color);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    align-items: end;
+}
+
+.filter-bar .form-group {
+    margin-bottom: 0;
+}
+
+.supermarket-list-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.supermarket-list-row label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--input-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+}
+
+.supermarket-list-row label:hover {
+    border-color: var(--primary);
+}
+
+.supermarket-list-row input:checked + span {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+/* Grid do dashboard */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.chart-container {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.chart-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.chart-toggles {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.chart-toggles button {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.chart-toggles button:hover {
+    border-color: var(--primary);
+}
+
+.chart-toggles button.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* Tabela de caça-ofertas */
+.table-container {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.category-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.category-filters button {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.category-filters button:hover {
+    border-color: var(--primary);
+}
+
+.category-filters button.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+#bargainsTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#bargainsTable th {
+    background: var(--input-bg);
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#bargainsTable td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#bargainsTable tr:hover {
+    background: var(--input-bg);
+}
+
+.price-badge {
+    background: var(--accent);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+/* Animações */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .filter-bar {
+        grid-template-columns: 1fr;
+    }
+    
+    .summary-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .summary-cards {
+        grid-template-columns: 1fr;
+    }
+}
