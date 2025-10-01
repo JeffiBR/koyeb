@@ -106,7 +106,7 @@ class UserUpdate(BaseModel):
 class ProfileUpdate(BaseModel):
     full_name: str; job_title: str; avatar_url: Optional[str] = None
 class Supermercado(BaseModel):
-    id: Optional[int] = None; nome: str; cnpj: str
+    id: Optional[int] = None; nome: str; cnpj: str; endereco: Optional[str] = None  # Campo endereco adicionado
 class RealtimeSearchRequest(BaseModel):
     produto: str; cnpjs: List[str]
 class PriceHistoryRequest(BaseModel):
@@ -217,28 +217,45 @@ async def get_collection_status(user: UserProfile = Depends(get_current_user)):
 # --- Gerenciamento de Supermercados ---
 @app.get("/api/supermarkets", response_model=List[Supermercado])
 async def list_supermarkets_admin(user: UserProfile = Depends(get_current_user)):
-    resp = supabase.table('supermercados').select('id, nome, cnpj').order('nome').execute()
+    resp = supabase.table('supermercados').select('id, nome, cnpj, endereco').order('nome').execute()
     return resp.data
 
 @app.post("/api/supermarkets", status_code=201, response_model=Supermercado)
 async def create_supermarket(market: Supermercado, user: UserProfile = Depends(require_page_access('markets'))):
-    resp = supabase.table('supermercados').insert(market.dict(exclude={'id'})).execute()
+    # Remove campos None para evitar problemas com o banco
+    market_data = market.dict(exclude={'id'})
+    market_data = {k: v for k, v in market_data.items() if v is not None}
+    
+    resp = supabase.table('supermercados').insert(market_data).execute()
     return resp.data[0]
 
 @app.put("/api/supermarkets/{id}", response_model=Supermercado)
 async def update_supermarket(id: int, market: Supermercado, user: UserProfile = Depends(require_page_access('markets'))):
-    resp = supabase.table('supermercados').update(market.dict(exclude={'id'})).eq('id', id).execute()
-    if not resp.data: raise HTTPException(status_code=404, detail="Mercado não encontrado")
+    # Remove campos None e o id
+    market_data = market.dict(exclude={'id'})
+    market_data = {k: v for k, v in market_data.items() if v is not None}
+    
+    resp = supabase.table('supermercados').update(market_data).eq('id', id).execute()
+    if not resp.data: 
+        raise HTTPException(status_code=404, detail="Mercado não encontrado")
     return resp.data[0]
 
 @app.delete("/api/supermarkets/{id}", status_code=204)
 async def delete_supermarket(id: int, user: UserProfile = Depends(require_page_access('markets'))):
-    supabase.table('supermercados').delete().eq('id', id).execute(); return
+    supabase.table('supermercados').delete().eq('id', id).execute()
+    return
+
+# --- Endpoint Público de Supermercados ---
+@app.get("/api/supermarkets/public", response_model=List[Supermercado])
+async def list_supermarkets_public():
+    resp = supabase.table('supermercados').select('id, nome, cnpj, endereco').order('nome').execute()
+    return resp.data
 
 # --- Gerenciamento de Dados Históricos ---
 @app.get("/api/collections")
 async def list_collections(user: UserProfile = Depends(require_page_access('collections'))):
-    response = supabase.table('coletas').select('*').order('iniciada_em', desc=True).execute(); return response.data
+    response = supabase.table('coletas').select('*').order('iniciada_em', desc=True).execute()
+    return response.data
 
 @app.get("/api/collections/{collection_id}/details")
 async def get_collection_details(collection_id: int, user: UserProfile = Depends(require_page_access('collections'))):
@@ -247,7 +264,8 @@ async def get_collection_details(collection_id: int, user: UserProfile = Depends
 
 @app.delete("/api/collections/{collection_id}", status_code=204)
 async def delete_collection(collection_id: int, user: UserProfile = Depends(require_page_access('collections'))):
-    supabase.table('coletas').delete().eq('id', collection_id).execute(); return
+    supabase.table('coletas').delete().eq('id', collection_id).execute()
+    return
 
 @app.post("/api/prune-by-collections")
 async def prune_by_collections(request: PruneByCollectionsRequest, user: UserProfile = Depends(require_page_access('prune'))):
@@ -264,11 +282,6 @@ async def get_collections_by_market(cnpj: str, user: UserProfile = Depends(requi
     return response.data
 
 # --- Endpoints Públicos e de Usuário Logado ---
-@app.get("/api/supermarkets/public", response_model=List[Supermercado])
-async def list_supermarkets_public():
-    resp = supabase.table('supermercados').select('id, nome, cnpj').order('nome').execute()
-    return resp.data
-
 @app.get("/api/products-log")
 async def get_products_log(page: int = 1, page_size: int = 50, user: UserProfile = Depends(require_page_access('product_log'))):
     start_index = (page - 1) * page_size
