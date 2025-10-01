@@ -3,21 +3,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const barcodesInput = document.getElementById('barcodesInput');
     const supermarketGrid = document.getElementById('supermarketGrid');
     const compareButton = document.getElementById('compareButton');
-    const chartCanvas = document.getElementById('priceChart');
-    const chartContainer = document.getElementById('chartContainer');
-    const infographicContainer = document.getElementById('infographicContainer');
-    const dataTableContainer = document.getElementById('dataTableContainer');
-    const loadingContainer = document.getElementById('loadingContainer');
+    const resultsContainer = document.getElementById('resultsContainer');
+    const loader = document.getElementById('loader');
+    const emptyState = document.getElementById('emptyState');
+    const productsList = document.getElementById('productsList');
     
-    // Elementos do infográfico
-    const totalProducts = document.getElementById('totalProducts');
-    const totalMarkets = document.getElementById('totalMarkets');
-    const analysisPeriod = document.getElementById('analysisPeriod');
-    const maxVariation = document.getElementById('maxVariation');
-    const bestPricesList = document.getElementById('bestPricesList');
-    const trendsList = document.getElementById('trendsList');
-    const alertsList = document.getElementById('alertsList');
-    const dataTableBody = document.querySelector('#dataTable tbody');
+    // Elementos do sumário
+    const foundProducts = document.getElementById('foundProducts');
+    const activeMarkets = document.getElementById('activeMarkets');
+    const maxSaving = document.getElementById('maxSaving');
+    const lastUpdate = document.getElementById('lastUpdate');
 
     // Controles de mercado
     const marketSearch = document.getElementById('marketSearch');
@@ -26,11 +21,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const deselectAllMarkets = document.getElementById('deselectAllMarkets');
     const selectedCount = document.getElementById('selectedCount');
 
-    let priceChart = null;
     let allMarkets = [];
     let filteredMarkets = [];
     let selectedMarkets = new Set();
-    let comparisonData = [];
+    let currentResults = [];
 
     // Inicialização
     initializePage();
@@ -106,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
         deselectAllMarkets.addEventListener('click', clearMarketSelection);
         
         // Comparação
-        compareButton.addEventListener('click', comparePrices);
+        compareButton.addEventListener('click', searchCurrentPrices);
     }
 
     function validateBarcodes() {
@@ -159,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderMarketGrid(filteredMarkets);
     }
 
-    async function comparePrices() {
+    async function searchCurrentPrices() {
         const barcodesText = barcodesInput.value.trim();
         const selectedCnpjs = Array.from(selectedMarkets);
         
@@ -175,10 +169,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const barcodes = barcodesText.split(',').map(b => b.trim()).filter(b => b);
         
-        loadingContainer.style.display = 'flex';
-        chartContainer.style.display = 'none';
-        infographicContainer.style.display = 'none';
-        dataTableContainer.style.display = 'none';
+        loader.style.display = 'flex';
+        resultsContainer.style.display = 'none';
+        emptyState.style.display = 'none';
 
         try {
             const session = await getSession();
@@ -187,428 +180,218 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Buscar dados para todos os códigos e mercados
-            comparisonData = [];
+            // Buscar preços atuais para todos os códigos usando a mesma API do search.html
+            currentResults = [];
             
             for (const barcode of barcodes) {
-                const productData = await fetchProductData(barcode, selectedCnpjs, session);
-                if (productData) {
-                    comparisonData.push(productData);
+                const productData = await fetchProductPrices(barcode, selectedCnpjs, session);
+                if (productData && productData.prices.length > 0) {
+                    currentResults.push(productData);
                 }
             }
 
-            if (comparisonData.length === 0) {
-                showNotification('Nenhum dado encontrado para os critérios informados', 'warning');
+            if (currentResults.length === 0) {
+                loader.style.display = 'none';
+                emptyState.style.display = 'block';
+                showNotification('Nenhum preço encontrado para os critérios informados', 'warning');
                 return;
             }
 
-            renderChart();
-            renderInfographic();
-            renderDataTable();
+            renderResults();
+            updateSummary();
             
-            chartContainer.style.display = 'block';
-            infographicContainer.style.display = 'block';
-            dataTableContainer.style.display = 'block';
+            resultsContainer.style.display = 'block';
+            emptyState.style.display = 'none';
             
         } catch (error) {
-            console.error('Erro na comparação:', error);
-            showNotification('Erro ao buscar dados de comparação', 'error');
+            console.error('Erro na busca:', error);
+            showNotification('Erro ao buscar preços atuais', 'error');
         } finally {
-            loadingContainer.style.display = 'none';
+            loader.style.display = 'none';
         }
     }
 
-    async function fetchProductData(barcode, cnpjs, session) {
+    async function fetchProductPrices(barcode, cnpjs, session) {
         try {
-            // Buscar dados históricos do produto
-            const response = await fetch(`/api/price-history`, {
+            // Usar a mesma API de busca em tempo real do search.html
+            const response = await authenticatedFetch('/api/realtime-search', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${session.access_token}`
                 },
-                body: JSON.stringify({ 
-                    product_identifier: barcode, 
-                    cnpjs: cnpjs,
-                    start_date: getDefaultStartDate(),
-                    end_date: new Date().toISOString().split('T')[0]
+                body: JSON.stringify({
+                    produto: barcode,
+                    cnpjs: cnpjs
                 })
             });
-            
+
             if (!response.ok) {
                 const error = await response.json();
                 throw new Error(error.detail || 'Erro na requisição');
             }
-            
-            const historyData = await response.json();
-            
-            // Buscar informações do produto
-            const productInfo = await fetchProductInfo(barcode, session);
-            
+
+            const data = await response.json();
+            const results = data.results || [];
+
+            if (results.length === 0) {
+                return null;
+            }
+
+            // Processar resultados - agrupar por produto e calcular diferenças
+            const productInfo = {
+                nome: results[0].nome_produto || `Produto ${barcode}`,
+                marca: results[0].marca || '',
+                categoria: results[0].categoria || '',
+                codigo_barras: barcode
+            };
+
+            const prices = results.map(item => ({
+                marketCnpj: item.cnpj_supermercado,
+                marketName: allMarkets.find(m => m.cnpj === item.cnpj_supermercado)?.nome || item.cnpj_supermercado,
+                price: item.preco_produto || 0,
+                lastUpdate: item.data_ultima_venda || new Date().toISOString(),
+                available: item.disponivel || false
+            }));
+
+            // Calcular diferenças percentuais em relação ao menor preço
+            const validPrices = prices.filter(p => p.price > 0);
+            if (validPrices.length > 0) {
+                const lowestPrice = Math.min(...validPrices.map(p => p.price));
+                
+                prices.forEach(priceData => {
+                    if (priceData.price > 0 && lowestPrice > 0) {
+                        priceData.percentageDifference = ((priceData.price - lowestPrice) / lowestPrice) * 100;
+                    } else {
+                        priceData.percentageDifference = 0;
+                    }
+                });
+            }
+
             return {
                 barcode,
                 productInfo,
-                history: historyData,
-                markets: cnpjs,
-                analysis: analyzeProductData(historyData, productInfo)
+                prices: prices.sort((a, b) => a.price - b.price), // Ordenar do menor para o maior preço
+                lowestPrice: validPrices.length > 0 ? Math.min(...validPrices.map(p => p.price)) : 0
             };
             
         } catch (error) {
-            console.error(`Erro ao buscar dados para ${barcode}:`, error);
+            console.error(`Erro ao buscar preços para ${barcode}:`, error);
             return null;
         }
     }
 
-    async function fetchProductInfo(barcode, session) {
-        try {
-            const response = await fetch(`/api/product-info/${barcode}`, {
-                headers: {
-                    'Authorization': `Bearer ${session.access_token}`
-                }
-            });
-            
-            if (response.ok) {
-                return await response.json();
-            }
-            return { nome: `Produto ${barcode}`, marca: '', categoria: '' };
-        } catch (error) {
-            return { nome: `Produto ${barcode}`, marca: '', categoria: '' };
-        }
-    }
-
-    function analyzeProductData(historyData, productInfo) {
-        const analysis = {
-            currentPrices: {},
-            priceChanges: {},
-            bestPrice: { value: Infinity, market: '' },
-            worstPrice: { value: 0, market: '' },
-            trends: {},
-            alerts: []
-        };
-
-        // Analisar dados de cada mercado
-        Object.entries(historyData).forEach(([market, dataPoints]) => {
-            if (dataPoints.length > 0) {
-                const latestPrice = dataPoints[dataPoints.length - 1].y;
-                const oldestPrice = dataPoints[0].y;
-                
-                analysis.currentPrices[market] = latestPrice;
-                analysis.priceChanges[market] = ((latestPrice - oldestPrice) / oldestPrice) * 100;
-                
-                // Melhor preço
-                if (latestPrice < analysis.bestPrice.value) {
-                    analysis.bestPrice = { value: latestPrice, market };
-                }
-                
-                // Pior preço
-                if (latestPrice > analysis.worstPrice.value) {
-                    analysis.worstPrice = { value: latestPrice, market };
-                }
-                
-                // Tendência (últimos 7 dias)
-                if (dataPoints.length >= 7) {
-                    const recentPoints = dataPoints.slice(-7);
-                    const trend = calculateTrend(recentPoints);
-                    analysis.trends[market] = trend;
-                }
-            }
-        });
-
-        // Gerar alertas
-        if (analysis.bestPrice.value > 0 && analysis.worstPrice.value > 0) {
-            const priceDifference = ((analysis.worstPrice.value - analysis.bestPrice.value) / analysis.bestPrice.value) * 100;
-            
-            if (priceDifference > 50) {
-                analysis.alerts.push(`Diferença de preço extrema: ${priceDifference.toFixed(1)}% entre mercados`);
-            }
-            
-            if (Object.values(analysis.priceChanges).some(change => change > 20)) {
-                analysis.alerts.push('Aumentos significativos de preço detectados');
-            }
-        }
-
-        return analysis;
-    }
-
-    function calculateTrend(dataPoints) {
-        if (dataPoints.length < 2) return 'estável';
+    function renderResults() {
+        productsList.innerHTML = '';
         
-        const firstPrice = dataPoints[0].y;
-        const lastPrice = dataPoints[dataPoints.length - 1].y;
-        const change = ((lastPrice - firstPrice) / firstPrice) * 100;
-        
-        if (change > 5) return 'alta';
-        if (change < -5) return 'baixa';
-        return 'estável';
+        currentResults.forEach(productData => {
+            const productCard = createProductCard(productData);
+            productsList.appendChild(productCard);
+        });
     }
 
-    function renderChart() {
-        if (priceChart) {
-            priceChart.destroy();
-        }
-
-        const ctx = chartCanvas.getContext('2d');
-        const datasets = [];
-
-        // Cores para os mercados
-        const marketColors = generateColors(selectedMarkets.size);
-        const marketColorMap = {};
-        Array.from(selectedMarkets).forEach((cnpj, index) => {
-            const market = allMarkets.find(m => m.cnpj === cnpj);
-            marketColorMap[cnpj] = {
-                color: marketColors[index],
-                name: market ? market.nome : cnpj
-            };
-        });
-
-        // Criar datasets para cada produto em cada mercado
-        comparisonData.forEach((productData, productIndex) => {
-            Object.entries(productData.history).forEach(([marketCnpj, dataPoints]) => {
-                if (selectedMarkets.has(marketCnpj) && dataPoints.length > 0) {
-                    const marketInfo = marketColorMap[marketCnpj];
-                    datasets.push({
-                        label: `${productData.productInfo.nome} - ${marketInfo.name}`,
-                        data: dataPoints,
-                        borderColor: marketInfo.color,
-                        backgroundColor: marketInfo.color + '20',
-                        borderWidth: 2,
-                        tension: 0.1,
-                        fill: false
-                    });
-                }
-            });
-        });
-
-        priceChart = new Chart(ctx, {
-            type: 'line',
-            data: { datasets },
-            options: {
-                responsive: true,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Evolução de Preços por Produto e Mercado'
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return `${context.dataset.label}: R$ ${context.parsed.y.toFixed(2)}`;
-                            }
-                        }
+    function createProductCard(productData) {
+        const card = document.createElement('div');
+        card.className = 'product-comparison-card';
+        
+        const hasPrices = productData.prices.some(p => p.price > 0);
+        const availableMarkets = productData.prices.filter(p => p.price > 0).length;
+        
+        card.innerHTML = `
+            <div class="product-header">
+                <div class="product-main-info">
+                    <h4 class="product-name">${productData.productInfo.nome}</h4>
+                    <div class="product-barcode">Código: ${productData.barcode}</div>
+                </div>
+                <div class="product-stats">
+                    <span class="market-count">${availableMarkets} mercados</span>
+                    ${productData.lowestPrice > 0 ? 
+                        `<span class="lowest-price">Melhor: R$ ${productData.lowestPrice.toFixed(2)}</span>` : 
+                        ''
                     }
-                },
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: {
-                            unit: 'day',
-                            tooltipFormat: 'dd/MM/yyyy'
-                        },
-                        title: {
-                            display: true,
-                            text: 'Data'
-                        }
-                    },
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Preço (R$)'
-                        },
-                        ticks: {
-                            callback: (value) => 'R$ ' + value.toFixed(2)
-                        }
-                    }
+                </div>
+            </div>
+            <div class="prices-comparison">
+                ${hasPrices ? 
+                    productData.prices.map(priceData => createPriceRow(priceData, productData.lowestPrice)).join('') 
+                    : '<div class="no-prices">Nenhum preço disponível nos mercados selecionados</div>'
                 }
-            }
-        });
+            </div>
+        `;
+        
+        return card;
     }
 
-    function renderInfographic() {
-        // Estatísticas gerais
-        totalProducts.textContent = comparisonData.length;
-        totalMarkets.textContent = selectedMarkets.size;
-        
-        // Período de análise
-        const dates = getAllDates();
-        if (dates.length > 0) {
-            const startDate = new Date(Math.min(...dates));
-            const endDate = new Date(Math.max(...dates));
-            analysisPeriod.textContent = `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
-        }
-        
-        // Maior variação
-        const maxVar = findMaxVariation();
-        maxVariation.textContent = maxVar ? `${maxVar.variation.toFixed(1)}%` : '-';
-
-        // Melhores preços
-        renderBestPrices();
-        
-        // Tendências
-        renderTrends();
-        
-        // Alertas
-        renderAlerts();
-    }
-
-    function getAllDates() {
-        const allDates = [];
-        comparisonData.forEach(product => {
-            Object.values(product.history).forEach(dataPoints => {
-                dataPoints.forEach(point => {
-                    allDates.push(new Date(point.x).getTime());
-                });
-            });
-        });
-        return allDates;
-    }
-
-    function findMaxVariation() {
-        let maxVariation = null;
-        
-        comparisonData.forEach(product => {
-            Object.entries(product.analysis.priceChanges).forEach(([market, change]) => {
-                if (!maxVariation || Math.abs(change) > Math.abs(maxVariation.variation)) {
-                    maxVariation = {
-                        product: product.productInfo.nome,
-                        market: allMarkets.find(m => m.cnpj === market)?.nome || market,
-                        variation: change
-                    };
-                }
-            });
-        });
-        
-        return maxVariation;
-    }
-
-    function renderBestPrices() {
-        bestPricesList.innerHTML = '';
-        
-        comparisonData.forEach(product => {
-            const best = product.analysis.bestPrice;
-            if (best.market && best.value < Infinity) {
-                const marketName = allMarkets.find(m => m.cnpj === best.market)?.nome || best.market;
-                const priceItem = document.createElement('div');
-                priceItem.className = 'price-item';
-                priceItem.innerHTML = `
-                    <strong>${product.productInfo.nome}</strong>
-                    <span>R$ ${best.value.toFixed(2)}</span>
-                    <small>${marketName}</small>
-                `;
-                bestPricesList.appendChild(priceItem);
-            }
-        });
-    }
-
-    function renderTrends() {
-        trendsList.innerHTML = '';
-        
-        const trendSummary = { alta: 0, baixa: 0, estável: 0 };
-        
-        comparisonData.forEach(product => {
-            Object.values(product.analysis.trends).forEach(trend => {
-                trendSummary[trend]++;
-            });
-        });
-        
-        Object.entries(trendSummary).forEach(([trend, count]) => {
-            if (count > 0) {
-                const trendItem = document.createElement('div');
-                trendItem.className = `trend-item trend-${trend}`;
-                trendItem.innerHTML = `
-                    <i class="fas fa-${getTrendIcon(trend)}"></i>
-                    <span>${count} ${trend}</span>
-                `;
-                trendsList.appendChild(trendItem);
-            }
-        });
-    }
-
-    function renderAlerts() {
-        alertsList.innerHTML = '';
-        
-        const allAlerts = new Set();
-        comparisonData.forEach(product => {
-            product.analysis.alerts.forEach(alert => allAlerts.add(alert));
-        });
-        
-        if (allAlerts.size === 0) {
-            alertsList.innerHTML = '<div class="alert-item no-alerts">Nenhum alerta crítico</div>';
-            return;
-        }
-        
-        Array.from(allAlerts).forEach(alert => {
-            const alertItem = document.createElement('div');
-            alertItem.className = 'alert-item';
-            alertItem.innerHTML = `
-                <i class="fas fa-exclamation-triangle"></i>
-                <span>${alert}</span>
+    function createPriceRow(priceData, lowestPrice) {
+        if (priceData.price <= 0) {
+            return `
+                <div class="price-row unavailable">
+                    <div class="market-info">
+                        <span class="market-name">${priceData.marketName}</span>
+                    </div>
+                    <div class="price-info">
+                        <span class="price-value">Indisponível</span>
+                    </div>
+                </div>
             `;
-            alertsList.appendChild(alertItem);
-        });
+        }
+
+        const isLowest = Math.abs(priceData.price - lowestPrice) < 0.01;
+        const differenceClass = isLowest ? 'lowest' : priceData.percentageDifference > 0 ? 'higher' : 'equal';
+        
+        return `
+            <div class="price-row ${differenceClass}">
+                <div class="market-info">
+                    <span class="market-name">${priceData.marketName}</span>
+                </div>
+                <div class="price-info">
+                    <span class="price-value">R$ ${priceData.price.toFixed(2)}</span>
+                    ${!isLowest ? 
+                        `<span class="price-difference">+${priceData.percentageDifference.toFixed(1)}%</span>` 
+                        : '<span class="best-price-tag">Melhor Preço</span>'
+                    }
+                </div>
+            </div>
+        `;
     }
 
-    function renderDataTable() {
-        dataTableBody.innerHTML = '';
+    function updateSummary() {
+        // Produtos encontrados
+        foundProducts.textContent = currentResults.length;
         
-        comparisonData.forEach(product => {
-            Object.entries(product.analysis.currentPrices).forEach(([marketCnpj, price]) => {
-                const market = allMarkets.find(m => m.cnpj === marketCnpj);
-                const change = product.analysis.priceChanges[marketCnpj] || 0;
-                const trend = product.analysis.trends[marketCnpj] || 'estável';
-                
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${product.productInfo.nome}</td>
-                    <td>${product.barcode}</td>
-                    <td>${market ? market.nome : marketCnpj}</td>
-                    <td>R$ ${price.toFixed(2)}</td>
-                    <td class="change-${change >= 0 ? 'positive' : 'negative'}">
-                        ${change >= 0 ? '+' : ''}${change.toFixed(1)}%
-                    </td>
-                    <td>${getLatestDate(product.history[marketCnpj])}</td>
-                `;
-                dataTableBody.appendChild(row);
+        // Mercados com preços
+        const marketsWithPrices = new Set();
+        currentResults.forEach(product => {
+            product.prices.forEach(price => {
+                if (price.price > 0) {
+                    marketsWithPrices.add(price.marketCnpj);
+                }
             });
         });
+        activeMarkets.textContent = marketsWithPrices.size;
+        
+        // Maior economia
+        let maxSavingValue = 0;
+        currentResults.forEach(product => {
+            if (product.prices.length >= 2) {
+                const prices = product.prices.filter(p => p.price > 0).map(p => p.price);
+                if (prices.length >= 2) {
+                    const minPrice = Math.min(...prices);
+                    const maxPrice = Math.max(...prices);
+                    const saving = ((maxPrice - minPrice) / maxPrice) * 100;
+                    if (saving > maxSavingValue) {
+                        maxSavingValue = saving;
+                    }
+                }
+            }
+        });
+        maxSaving.textContent = maxSavingValue > 0 ? `${maxSavingValue.toFixed(1)}%` : '-';
+        
+        // Última atualização
+        lastUpdate.textContent = new Date().toLocaleTimeString();
     }
 
     // Funções utilitárias
-    function getDefaultStartDate() {
-        const date = new Date();
-        date.setDate(date.getDate() - 30); // Últimos 30 dias
-        return date.toISOString().split('T')[0];
-    }
-
-    function getLatestDate(dataPoints) {
-        if (!dataPoints || dataPoints.length === 0) return '-';
-        const latestDate = new Date(Math.max(...dataPoints.map(p => new Date(p.x).getTime())));
-        return latestDate.toLocaleDateString();
-    }
-
-    function getTrendIcon(trend) {
-        switch (trend) {
-            case 'alta': return 'arrow-up';
-            case 'baixa': return 'arrow-down';
-            default: return 'minus';
-        }
-    }
-
-    function generateColors(count) {
-        const colors = [];
-        const hueStep = 360 / count;
-        
-        for (let i = 0; i < count; i++) {
-            const hue = (i * hueStep) % 360;
-            colors.push(`hsl(${hue}, 70%, 50%)`);
-        }
-        
-        return colors;
-    }
-
     function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -622,7 +405,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showNotification(message, type = 'info') {
-        // Implementação da função de notificação (similar à do admin.js)
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         const icon = type === 'success' ? 'fa-check-circle' : 
