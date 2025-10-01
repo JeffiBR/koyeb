@@ -90,32 +90,148 @@
                         <i class="fas fa-chart-bar"></i>
                         <h2>Comparador de Preços</h2>
                     </div>
-                    <p class="panel-description">Compare a evolução dos preços de produtos ao longo do tempo entre diferentes mercados.</p>
+                    <p class="panel-description">Compare a evolução dos preços de produtos por código de barras entre diferentes mercados.</p>
                     
                     <div class="form-container">
                         <div class="form-group full-width">
-                            <label for="productInput">Produto (Nome ou Cód. de Barras)</label>
-                            <input type="text" id="productInput" placeholder="Ex: Leite Integral ou 789...">
+                            <label for="barcodesInput">Códigos de Barras (até 10, separados por vírgula)</label>
+                            <textarea id="barcodesInput" placeholder="Ex: 7891234567890, 7899876543210, 7895555555555" rows="3"></textarea>
+                            <div class="input-info">
+                                <i class="fas fa-info-circle"></i>
+                                <span>Insite até 10 códigos de barras separados por vírgula</span>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="startDate">Data de Início</label>
-                            <input type="date" id="startDate">
-                        </div>
-                        <div class="form-group">
-                            <label for="endDate">Data de Fim</label>
-                            <input type="date" id="endDate">
-                        </div>
+
                         <div class="form-group full-width">
                             <label>Selecione os Mercados para Comparar (mínimo 2)</label>
-                            <div id="supermarketFilters" class="supermarket-list"></div>
+                            <div id="supermarketFilters" class="market-filters">
+                                <details open>
+                                    <summary>
+                                        <div class="summary-content">
+                                            <i class="fas fa-store"></i>
+                                            <span>Mercados Disponíveis</span>
+                                            <span class="selection-count" id="selectedCount">0 selecionados</span>
+                                        </div>
+                                    </summary>
+                                    <div class="filters-container">
+                                        <div class="market-search-controls">
+                                            <div class="search-box">
+                                                <i class="fas fa-search"></i>
+                                                <input type="text" id="marketSearch" placeholder="Buscar mercado...">
+                                                <button class="clear-btn" id="clearMarketSearch">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                            <div class="selection-actions">
+                                                <button class="btn small outline" id="selectAllMarkets">
+                                                    <i class="fas fa-check-double"></i>
+                                                    Selecionar Todos
+                                                </button>
+                                                <button class="btn small outline" id="deselectAllMarkets">
+                                                    <i class="fas fa-times"></i>
+                                                    Limpar Seleção
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="supermarket-grid" id="supermarketGrid">
+                                            <!-- Mercados serão carregados aqui -->
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
                         </div>
+
                         <button id="compareButton" class="btn full-width">
                             <i class="fas fa-chart-line"></i> Comparar Preços
                         </button>
                     </div>
                     
-                    <div class="chart-container">
+                    <!-- Loading State -->
+                    <div id="loadingContainer" class="loader-container" style="display: none;">
+                        <div class="loader"></div>
+                        <p>Buscando dados de preços...</p>
+                    </div>
+
+                    <!-- Gráfico Principal -->
+                    <div class="chart-container" id="chartContainer" style="display: none;">
                         <canvas id="priceChart"></canvas>
+                    </div>
+
+                    <!-- Infográfico -->
+                    <div id="infographicContainer" class="infographic-container" style="display: none;">
+                        <div class="panel-header">
+                            <i class="fas fa-chart-pie"></i>
+                            <h3>Análise Comparativa</h3>
+                        </div>
+                        
+                        <div class="summary-cards">
+                            <div class="card">
+                                <div class="card-icon"><i class="fas fa-tags"></i></div>
+                                <div class="card-title">Produtos Analisados</div>
+                                <p id="totalProducts">0</p>
+                            </div>
+                            <div class="card">
+                                <div class="card-icon"><i class="fas fa-store"></i></div>
+                                <div class="card-title">Mercados Incluídos</div>
+                                <p id="totalMarkets">0</p>
+                            </div>
+                            <div class="card">
+                                <div class="card-icon"><i class="fas fa-calendar"></i></div>
+                                <div class="card-title">Período Analisado</div>
+                                <p id="analysisPeriod">-</p>
+                            </div>
+                            <div class="card">
+                                <div class="card-icon"><i class="fas fa-percentage"></i></div>
+                                <div class="card-title">Maior Variação</div>
+                                <p id="maxVariation">-</p>
+                            </div>
+                        </div>
+
+                        <div class="infographic-grid">
+                            <div class="infographic-card">
+                                <h4><i class="fas fa-trophy"></i> Melhores Preços Atuais</h4>
+                                <div id="bestPricesList" class="prices-list">
+                                    <!-- Lista de melhores preços -->
+                                </div>
+                            </div>
+                            
+                            <div class="infographic-card">
+                                <h4><i class="fas fa-chart-line"></i> Tendências</h4>
+                                <div id="trendsList" class="trends-list">
+                                    <!-- Lista de tendências -->
+                                </div>
+                            </div>
+                            
+                            <div class="infographic-card">
+                                <h4><i class="fas fa-exclamation-triangle"></i> Alertas</h4>
+                                <div id="alertsList" class="alerts-list">
+                                    <!-- Lista de alertas -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabela de Dados Detalhados -->
+                    <div id="dataTableContainer" class="table-container" style="display: none; margin-top: 2rem;">
+                        <div class="panel-header">
+                            <i class="fas fa-table"></i>
+                            <h3>Dados Detalhados</h3>
+                        </div>
+                        <table id="dataTable">
+                            <thead>
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>Código</th>
+                                    <th>Mercado</th>
+                                    <th>Preço Atual</th>
+                                    <th>Variação</th>
+                                    <th>Última Atualização</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Dados serão preenchidos via JavaScript -->
+                            </tbody>
+                        </table>
                     </div>
                 </main>
             </div>
@@ -125,5 +241,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="compare.js"></script>
+    <script src="user-menu.js"></script>
+    <script src="admin.js"></script>
 </body>
 </html>
