@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Elementos principais
     const barcodesInput = document.getElementById('barcodesInput');
+    const productNameInput = document.getElementById('productNameInput');
     const supermarketGrid = document.getElementById('supermarketGrid');
     const compareButton = document.getElementById('compareButton');
     const resultsContainer = document.getElementById('resultsContainer');
@@ -84,12 +85,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateSelectionCount() {
         selectedCount.textContent = `${selectedMarkets.size} selecionados`;
-        compareButton.disabled = selectedMarkets.size < 2;
+        updateCompareButtonState();
+    }
+
+    function updateCompareButtonState() {
+        const hasBarcodes = barcodesInput.value.trim().length > 0;
+        const hasProductName = productNameInput.value.trim().length > 0;
+        const hasMarkets = selectedMarkets.size >= 2;
+        
+        compareButton.disabled = !((hasBarcodes || hasProductName) && hasMarkets);
     }
 
     function setupEventListeners() {
-        // Busca em tempo real nos códigos de barras
-        barcodesInput.addEventListener('input', debounce(validateBarcodes, 500));
+        // Busca em tempo real nos códigos de barras e nome do produto
+        barcodesInput.addEventListener('input', debounce(validateInputs, 500));
+        productNameInput.addEventListener('input', debounce(validateInputs, 500));
         
         // Busca em mercados
         marketSearch.addEventListener('input', debounce(filterMarkets, 300));
@@ -103,22 +113,26 @@ document.addEventListener('DOMContentLoaded', () => {
         compareButton.addEventListener('click', searchCurrentPrices);
     }
 
-    function validateBarcodes() {
+    function validateInputs() {
         const barcodesText = barcodesInput.value.trim();
-        if (!barcodesText) return;
+        const productName = productNameInput.value.trim();
         
-        const barcodes = barcodesText.split(',').map(b => b.trim()).filter(b => b);
-        
-        if (barcodes.length > 10) {
-            showNotification('Máximo de 10 códigos de barras permitidos', 'warning');
-            barcodesInput.value = barcodes.slice(0, 10).join(', ');
+        if (barcodesText) {
+            const barcodes = barcodesText.split(',').map(b => b.trim()).filter(b => b);
+            
+            if (barcodes.length > 10) {
+                showNotification('Máximo de 10 códigos de barras permitidos', 'warning');
+                barcodesInput.value = barcodes.slice(0, 10).join(', ');
+            }
+            
+            // Valida formato básico de código de barras (apenas números)
+            const invalidBarcodes = barcodes.filter(b => !/^\d+$/.test(b));
+            if (invalidBarcodes.length > 0) {
+                showNotification(`Códigos inválidos: ${invalidBarcodes.join(', ')}`, 'error');
+            }
         }
         
-        // Valida formato básico de código de barras (apenas números)
-        const invalidBarcodes = barcodes.filter(b => !/^\d+$/.test(b));
-        if (invalidBarcodes.length > 0) {
-            showNotification(`Códigos inválidos: ${invalidBarcodes.join(', ')}`, 'error');
-        }
+        updateCompareButtonState();
     }
 
     function filterMarkets() {
@@ -155,10 +169,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function searchCurrentPrices() {
         const barcodesText = barcodesInput.value.trim();
+        const productName = productNameInput.value.trim();
         const selectedCnpjs = Array.from(selectedMarkets);
         
-        if (!barcodesText) {
-            showNotification('Insira pelo menos um código de barras', 'error');
+        if (!barcodesText && !productName) {
+            showNotification('Insira códigos de barras ou nome do produto', 'error');
             return;
         }
         
@@ -167,8 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const barcodes = barcodesText.split(',').map(b => b.trim()).filter(b => b);
-        
+        const barcodes = barcodesText ? barcodesText.split(',').map(b => b.trim()).filter(b => b) : [];
+
         loader.style.display = 'flex';
         resultsContainer.style.display = 'none';
         emptyState.style.display = 'none';
@@ -180,11 +195,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Buscar preços atuais para todos os códigos usando a mesma API do search.html
             currentResults = [];
             
+            // Buscar por códigos de barras
             for (const barcode of barcodes) {
-                const productData = await fetchProductPrices(barcode, selectedCnpjs, session);
+                const productData = await fetchProductPrices(barcode, selectedCnpjs, session, 'barcode');
+                if (productData && productData.prices.length > 0) {
+                    currentResults.push(productData);
+                }
+            }
+            
+            // Buscar por nome do produto
+            if (productName) {
+                const productData = await fetchProductPrices(productName, selectedCnpjs, session, 'name');
                 if (productData && productData.prices.length > 0) {
                     currentResults.push(productData);
                 }
@@ -211,19 +234,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function fetchProductPrices(barcode, cnpjs, session) {
+    async function fetchProductPrices(searchTerm, cnpjs, session, searchType = 'barcode') {
         try {
-            // Usar a mesma API de busca em tempo real do search.html
+            const requestBody = searchType === 'barcode' 
+                ? { produto: searchTerm, cnpjs: cnpjs }
+                : { nome_produto: searchTerm, cnpjs: cnpjs };
+
             const response = await authenticatedFetch('/api/realtime-search', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${session.access_token}`
                 },
-                body: JSON.stringify({
-                    produto: barcode,
-                    cnpjs: cnpjs
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
@@ -238,46 +261,86 @@ document.addEventListener('DOMContentLoaded', () => {
                 return null;
             }
 
-            // Processar resultados - agrupar por produto e calcular diferenças
-            const productInfo = {
-                nome: results[0].nome_produto || `Produto ${barcode}`,
-                marca: results[0].marca || '',
-                categoria: results[0].categoria || '',
-                codigo_barras: barcode
-            };
-
-            const prices = results.map(item => ({
-                marketCnpj: item.cnpj_supermercado,
-                marketName: allMarkets.find(m => m.cnpj === item.cnpj_supermercado)?.nome || item.cnpj_supermercado,
-                price: item.preco_produto || 0,
-                lastUpdate: item.data_ultima_venda || new Date().toISOString(),
-                available: item.disponivel || false
-            }));
-
-            // Calcular diferenças percentuais em relação ao menor preço
-            const validPrices = prices.filter(p => p.price > 0);
-            if (validPrices.length > 0) {
-                const lowestPrice = Math.min(...validPrices.map(p => p.price));
+            // Agrupar por produto (para busca por nome pode retornar múltiplos produtos)
+            const productsMap = new Map();
+            
+            results.forEach(item => {
+                const productKey = item.codigo_barras || item.nome_produto;
+                if (!productsMap.has(productKey)) {
+                    productsMap.set(productKey, {
+                        nome: item.nome_produto || `Produto ${searchTerm}`,
+                        marca: item.marca || '',
+                        categoria: item.categoria || '',
+                        codigo_barras: item.codigo_barras || '',
+                        prices: []
+                    });
+                }
                 
-                prices.forEach(priceData => {
-                    if (priceData.price > 0 && lowestPrice > 0) {
-                        priceData.percentageDifference = ((priceData.price - lowestPrice) / lowestPrice) * 100;
-                    } else {
-                        priceData.percentageDifference = 0;
-                    }
+                const product = productsMap.get(productKey);
+                product.prices.push({
+                    marketCnpj: item.cnpj_supermercado,
+                    marketName: allMarkets.find(m => m.cnpj === item.cnpj_supermercado)?.nome || item.cnpj_supermercado,
+                    price: item.preco_produto || 0,
+                    lastUpdate: item.data_ultima_venda || new Date().toISOString(),
+                    available: item.disponivel || false,
+                    lastSaleDate: item.data_ultima_venda ? formatLastSaleDate(item.data_ultima_venda) : 'Data não disponível'
+                });
+            });
+
+            // Processar cada produto encontrado
+            const productsData = [];
+            for (const [productKey, productInfo] of productsMap) {
+                const prices = productInfo.prices;
+                
+                // Calcular diferenças percentuais
+                const validPrices = prices.filter(p => p.price > 0);
+                if (validPrices.length > 0) {
+                    const lowestPrice = Math.min(...validPrices.map(p => p.price));
+                    
+                    prices.forEach(priceData => {
+                        if (priceData.price > 0 && lowestPrice > 0) {
+                            priceData.percentageDifference = ((priceData.price - lowestPrice) / lowestPrice) * 100;
+                        } else {
+                            priceData.percentageDifference = 0;
+                        }
+                    });
+                }
+
+                productsData.push({
+                    barcode: productInfo.codigo_barras,
+                    searchTerm: searchTerm,
+                    productInfo: productInfo,
+                    prices: prices.sort((a, b) => a.price - b.price),
+                    lowestPrice: validPrices.length > 0 ? Math.min(...validPrices.map(p => p.price)) : 0
                 });
             }
-
-            return {
-                barcode,
-                productInfo,
-                prices: prices.sort((a, b) => a.price - b.price), // Ordenar do menor para o maior preço
-                lowestPrice: validPrices.length > 0 ? Math.min(...validPrices.map(p => p.price)) : 0
-            };
+            
+            return productsData.length > 0 ? productsData[0] : null;
             
         } catch (error) {
-            console.error(`Erro ao buscar preços para ${barcode}:`, error);
+            console.error(`Erro ao buscar preços para ${searchTerm}:`, error);
             return null;
+        }
+    }
+
+    function formatLastSaleDate(dateString) {
+        if (!dateString) return 'Data não disponível';
+        
+        try {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffTime = Math.abs(now - date);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 1) {
+                return 'Ontem ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            } else if (diffDays <= 7) {
+                return `Há ${diffDays} dias`;
+            } else {
+                return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            }
+        } catch (e) {
+            return 'Data não disponível';
         }
     }
 
@@ -301,7 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="product-header">
                 <div class="product-main-info">
                     <h4 class="product-name">${productData.productInfo.nome}</h4>
-                    <div class="product-barcode">Código: ${productData.barcode}</div>
+                    <div class="product-barcode">${productData.barcode ? `Código: ${productData.barcode}` : 'Produto por nome'}</div>
                 </div>
                 <div class="product-stats">
                     <span class="market-count">${availableMarkets} mercados</span>
@@ -328,6 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="price-row unavailable">
                     <div class="market-info">
                         <span class="market-name">${priceData.marketName}</span>
+                        <span class="last-sale-date">${priceData.lastSaleDate}</span>
                     </div>
                     <div class="price-info">
                         <span class="price-value">Indisponível</span>
@@ -343,6 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="price-row ${differenceClass}">
                 <div class="market-info">
                     <span class="market-name">${priceData.marketName}</span>
+                    <span class="last-sale-date">${priceData.lastSaleDate}</span>
                 </div>
                 <div class="price-info">
                     <span class="price-value">R$ ${priceData.price.toFixed(2)}</span>
