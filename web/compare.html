@@ -161,27 +161,43 @@
                         
                         <!-- Sumário -->
                         <div class="summary-cards">
-                            <div class="card">
-                                <div class="card-icon"><i class="fas fa-barcode"></i></div>
-                                <div class="card-title">Produtos Encontrados</div>
-                                <p id="foundProducts">0</p>
-                            </div>
-                            <div class="card">
-                                <div class="card-icon"><i class="fas fa-store"></i></div>
-                                <div class="card-title">Mercados com Preços</div>
-                                <p id="activeMarkets">0</p>
-                            </div>
-                            <div class="card">
-                                <div class="card-icon"><i class="fas fa-percentage"></i></div>
-                                <div class="card-title">Maior Economia</div>
-                                <p id="maxSaving">-</p>
-                            </div>
-                            <div class="card">
-                                <div class="card-icon"><i class="fas fa-clock"></i></div>
-                                <div class="card-title">Última Atualização</div>
-                                <p id="lastUpdate">-</p>
-                            </div>
-                        </div>
+  <div class="summary-card">
+    <div class="summary-card-icon">
+      <i class="fas fa-box"></i>
+    </div>
+    <div class="summary-card-content">
+      <div class="summary-card-value" id="foundProducts">2</div>
+      <div class="summary-card-label">Produtos Encontrados</div>
+    </div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-card-icon">
+      <i class="fas fa-store"></i>
+    </div>
+    <div class="summary-card-content">
+      <div class="summary-card-value" id="activeMarkets">6</div>
+      <div class="summary-card-label">Mercados com Preços</div>
+    </div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-card-icon">
+      <i class="fas fa-chart-line"></i>
+    </div>
+    <div class="summary-card-content">
+      <div class="summary-card-value" id="maxSaving">14.2%</div>
+      <div class="summary-card-label">Maior Economia</div>
+    </div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-card-icon">
+      <i class="fas fa-clock"></i>
+    </div>
+    <div class="summary-card-content">
+      <div class="summary-card-value" id="lastUpdate">08:10:43</div>
+      <div class="summary-card-label">Última Atualização</div>
+    </div>
+  </div>
+</div>
 
                         <!-- Lista de Produtos -->
                         <div id="productsList" class="products-list">
@@ -205,3 +221,4 @@
     <script src="user-menu.js"></script>
 </body>
 </html>
+
