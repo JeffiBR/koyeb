@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comparador de Preços - Tempo Real</title>
+    <title>Dashboard Analítico</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
     <script src="theme.js"></script>
 </head>
 <body class="theme-dark">
-    <script>routeGuard('compare');</script>
+    <script>routeGuard('dashboard');</script>
 
     <div class="app-container">
         <aside class="sidebar">
@@ -26,8 +26,8 @@
                 <ul>
                     <li class="nav-header">ANÁLISE</li>
                     <li><a href="/search.html"><i class="fas fa-search"></i> Busca</a></li>
-                    <li data-permission="compare"><a href="/compare.html" class="active"><i class="fas fa-chart-bar"></i> Comparador</a></li>
-                    <li data-permission="dashboard"><a href="/dashboard.html"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+                    <li data-permission="compare"><a href="/compare.html"><i class="fas fa-chart-bar"></i> Comparador</a></li>
+                    <li data-permission="dashboard"><a href="/dashboard.html" class="active"><i class="fas fa-chart-line"></i> Dashboard</a></li>
                     
                     <li class="nav-header">ADMINISTRAÇÃO</li>
                     <li data-permission="coleta"><a href="/admin.html"><i class="fas fa-database"></i> Coleta</a></li>
@@ -87,138 +87,87 @@
             <div class="page-content">
                 <main class="admin-panel">
                     <div class="panel-header">
-                        <i class="fas fa-chart-bar"></i>
-                        <h2>Comparador de Preços - Tempo Real</h2>
+                        <i class="fas fa-chart-line"></i>
+                        <h2>Dashboard Analítico</h2>
                     </div>
-                    <p class="panel-description">Compare preços atuais de produtos por código de barras entre diferentes mercados.</p>
+                    <p class="panel-description">Visualize métricas e insights sobre os dados coletados do sistema.</p>
                     
-                    <div class="form-container">
-                        <div class="form-group full-width">
-                            <label for="barcodesInput">Códigos de Barras (até 10, separados por vírgula)</label>
-                            <textarea id="barcodesInput" placeholder="Ex: 7896012300268, 7897261800011, 7891234567890" rows="3"></textarea>
-                            <div class="input-info">
-                                <i class="fas fa-info-circle"></i>
-                                <span>Insira até 10 códigos de barras separados por vírgula</span>
-                            </div>
+                    <div class="filter-bar">
+                        <div class="form-group">
+                            <label>Supermercados (Opcional)</label>
+                            <div id="marketFilters" class="supermarket-list-row"></div>
                         </div>
-
-                        <div class="form-group full-width">
-                            <label>Selecione os Mercados para Comparar (mínimo 2)</label>
-                            <div id="supermarketFilters" class="market-filters">
-                                <details open>
-                                    <summary>
-                                        <div class="summary-content">
-                                            <i class="fas fa-store"></i>
-                                            <span>Mercados Disponíveis</span>
-                                            <span class="selection-count" id="selectedCount">0 selecionados</span>
-                                        </div>
-                                    </summary>
-                                    <div class="filters-container">
-                                        <div class="market-search-controls">
-                                            <div class="search-box">
-                                                <i class="fas fa-search"></i>
-                                                <input type="text" id="marketSearch" placeholder="Buscar mercado...">
-                                                <button class="clear-btn" id="clearMarketSearch">
-                                                    <i class="fas fa-times"></i>
-                                                </button>
-                                            </div>
-                                            <div class="selection-actions">
-                                                <button class="btn small outline" id="selectAllMarkets">
-                                                    <i class="fas fa-check-double"></i>
-                                                    Selecionar Todos
-                                                </button>
-                                                <button class="btn small outline" id="deselectAllMarkets">
-                                                    <i class="fas fa-times"></i>
-                                                    Limpar Seleção
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div class="supermarket-grid" id="supermarketGrid">
-                                            <!-- Mercados serão carregados aqui -->
-                                        </div>
-                                    </div>
-                                </details>
-                            </div>
+                        <div class="form-group">
+                            <label for="startDate">Período De:</label>
+                            <input type="date" id="startDate">
                         </div>
-
-                        <button id="compareButton" class="btn full-width">
-                            <i class="fas fa-search-dollar"></i> Buscar Preços em Tempo Real
+                        <div class="form-group">
+                            <label for="endDate">Até:</label>
+                            <input type="date" id="endDate">
+                        </div>
+                        <button id="applyFiltersBtn" class="btn">
+                            <i class="fas fa-filter"></i> Aplicar Filtros
                         </button>
                     </div>
-                    
-                    <!-- Loading State -->
-                    <div id="loader" class="loader-container" style="display: none;">
-                        <div class="loader"></div>
-                        <p>Buscando preços atuais...</p>
-                    </div>
 
-                    <!-- Resultados -->
-                    <div id="resultsContainer" style="display: none;">
-                        <div class="panel-header">
-                            <i class="fas fa-list-alt"></i>
-                            <h3>Resultados da Comparação</h3>
+                    <div class="summary-cards">
+                        <div class="card">
+                            <h3>Mercados</h3>
+                            <p id="total-mercados">...</p>
                         </div>
-                        
-                        <!-- Sumário -->
-                        <div class="summary-cards">
-  <div class="summary-card">
-    <div class="summary-card-icon">
-      <i class="fas fa-box"></i>
-    </div>
-    <div class="summary-card-content">
-      <div class="summary-card-value" id="foundProducts">2</div>
-      <div class="summary-card-label">Produtos Encontrados</div>
-    </div>
-  </div>
-  <div class="summary-card">
-    <div class="summary-card-icon">
-      <i class="fas fa-store"></i>
-    </div>
-    <div class="summary-card-content">
-      <div class="summary-card-value" id="activeMarkets">6</div>
-      <div class="summary-card-label">Mercados com Preços</div>
-    </div>
-  </div>
-  <div class="summary-card">
-    <div class="summary-card-icon">
-      <i class="fas fa-chart-line"></i>
-    </div>
-    <div class="summary-card-content">
-      <div class="summary-card-value" id="maxSaving">14.2%</div>
-      <div class="summary-card-label">Maior Economia</div>
-    </div>
-  </div>
-  <div class="summary-card">
-    <div class="summary-card-icon">
-      <i class="fas fa-clock"></i>
-    </div>
-    <div class="summary-card-content">
-      <div class="summary-card-value" id="lastUpdate">08:10:43</div>
-      <div class="summary-card-label">Última Atualização</div>
-    </div>
-  </div>
-</div>
-
-                        <!-- Lista de Produtos -->
-                        <div id="productsList" class="products-list">
-                            <!-- Produtos serão inseridos aqui -->
+                        <div class="card">
+                            <h3>Produtos Coletados</h3>
+                            <p id="total-produtos">...</p>
+                        </div>
+                        <div class="card">
+                            <h3>Coletas Realizadas</h3>
+                            <p id="total-coletas">...</p>
+                        </div>
+                        <div class="card">
+                            <h3>Última Coleta</h3>
+                            <p id="ultima-coleta">...</p>
                         </div>
                     </div>
 
-                    <!-- Estado Vazio -->
-                    <div id="emptyState" class="empty-state" style="display: none;">
-                        <i class="fas fa-search"></i>
-                        <h3>Nenhum dado encontrado</h3>
-                        <p>Execute uma busca para ver os resultados de comparação</p>
+                    <div class="dashboard-grid">
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h2>Top 10 Produtos Buscados</h2>
+                                <div class="chart-toggles" id="toggles-products"></div>
+                            </div>
+                            <canvas id="topProductsChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h2>Top 10 Mercados Selecionados</h2>
+                                <div class="chart-toggles" id="toggles-markets"></div>
+                            </div>
+                            <canvas id="topMarketsChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <h2>Caça-Ofertas: Produtos Mais Baratos</h2>
+                        <p>Compara produtos idênticos e mostra onde encontrar o menor preço no período e mercados selecionados.</p>
+                        <div class="category-filters"></div>
+                        <table id="bargainsTable">
+                            <thead>
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>Menor Preço</th>
+                                    <th>Supermercado</th>
+                                    <th>Data da Venda</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
                     </div>
                 </main>
             </div>
         </div>
     </div>
-
-    <script src="compare.js"></script>
-      <script src="mobile-menu.js"></script>
-    <script src="user-menu.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="dashboard.js"></script>
 </body>
 </html>
-
