@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Elementos principais
-    const barcodesInput = document.getElementById('barcodesInput');
-    const productNameInput = document.getElementById('productNameInput');
+    const productsInput = document.getElementById('productsInput');
+    const inputInfoText = document.getElementById('inputInfoText');
     const supermarketGrid = document.getElementById('supermarketGrid');
     const compareButton = document.getElementById('compareButton');
     const resultsContainer = document.getElementById('resultsContainer');
@@ -89,17 +89,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateCompareButtonState() {
-        const hasBarcodes = barcodesInput.value.trim().length > 0;
-        const hasProductName = productNameInput.value.trim().length > 0;
+        const productsText = productsInput.value.trim();
+        const hasProducts = productsText.length > 0;
         const hasMarkets = selectedMarkets.size >= 2;
         
-        compareButton.disabled = !((hasBarcodes || hasProductName) && hasMarkets);
+        compareButton.disabled = !(hasProducts && hasMarkets);
     }
 
     function setupEventListeners() {
-        // Busca em tempo real nos códigos de barras e nome do produto
-        barcodesInput.addEventListener('input', debounce(validateInputs, 500));
-        productNameInput.addEventListener('input', debounce(validateInputs, 500));
+        // Busca em tempo real nos produtos
+        productsInput.addEventListener('input', debounce(validateProductsInput, 500));
         
         // Busca em mercados
         marketSearch.addEventListener('input', debounce(filterMarkets, 300));
@@ -113,26 +112,68 @@ document.addEventListener('DOMContentLoaded', () => {
         compareButton.addEventListener('click', searchCurrentPrices);
     }
 
-    function validateInputs() {
-        const barcodesText = barcodesInput.value.trim();
-        const productName = productNameInput.value.trim();
+    function validateProductsInput() {
+        const productsText = productsInput.value.trim();
         
-        if (barcodesText) {
-            const barcodes = barcodesText.split(',').map(b => b.trim()).filter(b => b);
+        if (!productsText) {
+            inputInfoText.textContent = 'Insere até 5 produtos (códigos de barras ou nomes)';
+            updateCompareButtonState();
+            return;
+        }
+        
+        // Separar produtos por vírgula
+        const products = productsText.split(',').map(p => p.trim()).filter(p => p);
+        
+        // Verificar limite de produtos
+        if (products.length > 5) {
+            showNotification('Máximo de 5 produtos permitidos', 'warning');
+            productsInput.value = products.slice(0, 5).join(', ');
+            inputInfoText.textContent = `Limite de 5 produtos atingido (${products.length} inseridos)`;
+            updateCompareButtonState();
+            return;
+        }
+        
+        // Validar cada produto
+        const validationResults = products.map(validateProduct);
+        const invalidProducts = validationResults.filter(r => !r.valid);
+        
+        if (invalidProducts.length > 0) {
+            const invalidNames = invalidProducts.map(p => p.product).join(', ');
+            inputInfoText.textContent = `Produtos inválidos: ${invalidNames}`;
+            showNotification(`Produtos inválidos: ${invalidNames}`, 'error');
+        } else {
+            const barcodesCount = validationResults.filter(r => r.type === 'barcode').length;
+            const namesCount = validationResults.filter(r => r.type === 'name').length;
             
-            if (barcodes.length > 10) {
-                showNotification('Máximo de 10 códigos de barras permitidos', 'warning');
-                barcodesInput.value = barcodes.slice(0, 10).join(', ');
-            }
-            
-            // Valida formato básico de código de barras (apenas números)
-            const invalidBarcodes = barcodes.filter(b => !/^\d+$/.test(b));
-            if (invalidBarcodes.length > 0) {
-                showNotification(`Códigos inválidos: ${invalidBarcodes.join(', ')}`, 'error');
-            }
+            inputInfoText.textContent = `${products.length} produtos válidos (${barcodesCount} códigos, ${namesCount} nomes)`;
         }
         
         updateCompareButtonState();
+    }
+
+    function validateProduct(product) {
+        // Verificar se é código de barras (apenas números)
+        if (/^\d+$/.test(product)) {
+            // Validar comprimento do código de barras
+            if (product.length >= 8 && product.length <= 13) {
+                return { product, valid: true, type: 'barcode' };
+            } else {
+                return { product, valid: false, type: 'barcode', error: 'Código deve ter 8-13 dígitos' };
+            }
+        } 
+        // Verificar se é nome de produto (contém letras)
+        else if (/[a-zA-ZÀ-ÿ]/.test(product)) {
+            // Validar comprimento do nome
+            if (product.length >= 3) {
+                return { product, valid: true, type: 'name' };
+            } else {
+                return { product, valid: false, type: 'name', error: 'Nome deve ter pelo menos 3 caracteres' };
+            }
+        }
+        // Produto inválido
+        else {
+            return { product, valid: false, type: 'unknown', error: 'Formato não reconhecido' };
+        }
     }
 
     function filterMarkets() {
@@ -168,12 +209,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function searchCurrentPrices() {
-        const barcodesText = barcodesInput.value.trim();
-        const productName = productNameInput.value.trim();
+        const productsText = productsInput.value.trim();
         const selectedCnpjs = Array.from(selectedMarkets);
         
-        if (!barcodesText && !productName) {
-            showNotification('Insira códigos de barras ou nome do produto', 'error');
+        if (!productsText) {
+            showNotification('Insira produtos para comparar', 'error');
             return;
         }
         
@@ -182,7 +222,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const barcodes = barcodesText ? barcodesText.split(',').map(b => b.trim()).filter(b => b) : [];
+        // Validar produtos antes da busca
+        const products = productsText.split(',').map(p => p.trim()).filter(p => p);
+        const validationResults = products.map(validateProduct);
+        const invalidProducts = validationResults.filter(r => !r.valid);
+        
+        if (invalidProducts.length > 0) {
+            const invalidNames = invalidProducts.map(p => p.product).join(', ');
+            showNotification(`Produtos inválidos: ${invalidNames}`, 'error');
+            return;
+        }
 
         loader.style.display = 'flex';
         resultsContainer.style.display = 'none';
@@ -197,22 +246,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             currentResults = [];
             
-            // Buscar por códigos de barras
-            for (const barcode of barcodes) {
-                const productData = await fetchProductPrices(barcode, selectedCnpjs, session, 'barcode');
-                if (productData) {
+            // Buscar cada produto
+            for (const product of products) {
+                const validation = validateProduct(product);
+                const searchType = validation.type === 'barcode' ? 'barcode' : 'name';
+                
+                const productData = await fetchProductPrices(product, selectedCnpjs, session, searchType);
+                if (productData && productData.prices.length > 0) {
                     currentResults.push(productData);
-                }
-            }
-            
-            // Buscar por nome do produto
-            if (productName) {
-                const productsData = await fetchProductPrices(productName, selectedCnpjs, session, 'name');
-                if (productsData && productsData.length > 0) {
-                    // Adicionar todos os produtos encontrados na busca por nome
-                    currentResults.push(...productsData);
-                } else {
-                    console.log('Nenhum produto encontrado para:', productName);
                 }
             }
 
@@ -243,8 +284,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? { produto: searchTerm, cnpjs: cnpjs }
                 : { nome_produto: searchTerm, cnpjs: cnpjs };
 
-            console.log('Requisição para API:', { searchType, searchTerm, requestBody });
-
             const response = await authenticatedFetch('/api/realtime-search', {
                 method: 'POST',
                 headers: {
@@ -262,23 +301,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             const results = data.results || [];
 
-            console.log('Resposta da API:', { searchType, searchTerm, resultsCount: results.length });
-
             if (results.length === 0) {
                 return null;
             }
 
-            // Agrupar por produto
+            // Agrupar por produto (para busca por nome pode retornar múltiplos produtos)
             const productsMap = new Map();
             
             results.forEach(item => {
-                // Para busca por nome, usar o nome do produto como chave
-                const productKey = searchType === 'name' 
-                    ? `${item.nome_produto}_${item.marca || ''}_${item.codigo_barras || ''}`
-                    : item.codigo_barras;
-
-                if (!productKey) return; // Pular itens sem chave válida
-
+                const productKey = item.codigo_barras || item.nome_produto;
                 if (!productsMap.has(productKey)) {
                     productsMap.set(productKey, {
                         nome: item.nome_produto || `Produto ${searchTerm}`,
@@ -290,18 +321,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 const product = productsMap.get(productKey);
-                
-                // Apenas adicionar preços de mercados selecionados
-                if (cnpjs.includes(item.cnpj_supermercado)) {
-                    product.prices.push({
-                        marketCnpj: item.cnpj_supermercado,
-                        marketName: allMarkets.find(m => m.cnpj === item.cnpj_supermercado)?.nome || item.cnpj_supermercado,
-                        price: item.preco_produto || 0,
-                        lastUpdate: item.data_ultima_venda || new Date().toISOString(),
-                        available: item.disponivel || false,
-                        lastSaleDate: item.data_ultima_venda ? formatLastSaleDate(item.data_ultima_venda) : 'Data não disponível'
-                    });
-                }
+                product.prices.push({
+                    marketCnpj: item.cnpj_supermercado,
+                    marketName: allMarkets.find(m => m.cnpj === item.cnpj_supermercado)?.nome || item.cnpj_supermercado,
+                    price: item.preco_produto || 0,
+                    lastUpdate: item.data_ultima_venda || new Date().toISOString(),
+                    available: item.disponivel || false,
+                    lastSaleDate: item.data_ultima_venda ? formatLastSaleDate(item.data_ultima_venda) : 'Data não disponível'
+                });
             });
 
             // Processar cada produto encontrado
@@ -309,45 +336,34 @@ document.addEventListener('DOMContentLoaded', () => {
             for (const [productKey, productInfo] of productsMap) {
                 const prices = productInfo.prices;
                 
-                // Apenas processar produtos que têm preços em pelo menos um mercado
-                if (prices.length > 0) {
-                    // Calcular diferenças percentuais
-                    const validPrices = prices.filter(p => p.price > 0);
-                    if (validPrices.length > 0) {
-                        const lowestPrice = Math.min(...validPrices.map(p => p.price));
-                        
-                        prices.forEach(priceData => {
-                            if (priceData.price > 0 && lowestPrice > 0) {
-                                priceData.percentageDifference = ((priceData.price - lowestPrice) / lowestPrice) * 100;
-                            } else {
-                                priceData.percentageDifference = 0;
-                            }
-                        });
-                    }
-
-                    productsData.push({
-                        barcode: productInfo.codigo_barras,
-                        searchTerm: searchTerm,
-                        productInfo: productInfo,
-                        prices: prices.sort((a, b) => a.price - b.price),
-                        lowestPrice: validPrices.length > 0 ? Math.min(...validPrices.map(p => p.price)) : 0
+                // Calcular diferenças percentuais
+                const validPrices = prices.filter(p => p.price > 0);
+                if (validPrices.length > 0) {
+                    const lowestPrice = Math.min(...validPrices.map(p => p.price));
+                    
+                    prices.forEach(priceData => {
+                        if (priceData.price > 0 && lowestPrice > 0) {
+                            priceData.percentageDifference = ((priceData.price - lowestPrice) / lowestPrice) * 100;
+                        } else {
+                            priceData.percentageDifference = 0;
+                        }
                     });
                 }
+
+                productsData.push({
+                    barcode: productInfo.codigo_barras,
+                    searchTerm: searchTerm,
+                    searchType: searchType,
+                    productInfo: productInfo,
+                    prices: prices.sort((a, b) => a.price - b.price),
+                    lowestPrice: validPrices.length > 0 ? Math.min(...validPrices.map(p => p.price)) : 0
+                });
             }
             
-            console.log('Produtos processados:', { searchType, searchTerm, productsCount: productsData.length });
-            
-            // Para busca por código de barras, retornar o primeiro produto
-            // Para busca por nome, retornar todos os produtos encontrados
-            if (searchType === 'barcode') {
-                return productsData.length > 0 ? productsData[0] : null;
-            } else {
-                // Para busca por nome, retornar array com todos os produtos
-                return productsData.length > 0 ? productsData : null;
-            }
+            return productsData.length > 0 ? productsData[0] : null;
             
         } catch (error) {
-            console.error(`Erro ao buscar preços para ${searchTerm} (${searchType}):`, error);
+            console.error(`Erro ao buscar preços para ${searchTerm}:`, error);
             return null;
         }
     }
@@ -389,11 +405,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const hasPrices = productData.prices.some(p => p.price > 0);
         const availableMarkets = productData.prices.filter(p => p.price > 0).length;
         
+        // Determinar tipo de busca para exibição
+        const searchTypeLabel = productData.searchType === 'barcode' 
+            ? `Código: ${productData.barcode}` 
+            : 'Busca por nome';
+        
         card.innerHTML = `
             <div class="product-header">
                 <div class="product-main-info">
                     <h4 class="product-name">${productData.productInfo.nome}</h4>
-                    <div class="product-barcode">${productData.barcode ? `Código: ${productData.barcode}` : 'Produto por nome'}</div>
+                    <div class="product-barcode">${searchTypeLabel}</div>
                 </div>
                 <div class="product-stats">
                     <span class="market-count">${availableMarkets} mercados</span>
