@@ -4852,3 +4852,58 @@ body.light-mode .price-value {
         font-size: 1.8rem;
     }
 }
+
+/* Estilos para a data da última venda */
+.last-sale-date {
+    font-size: 0.8rem;
+    color: var(--muted-dark);
+    margin-top: 0.25rem;
+    font-style: italic;
+}
+
+body.light-mode .last-sale-date {
+    color: var(--muted-light);
+}
+
+.price-row.lowest .last-sale-date {
+    color: rgba(22, 163, 74, 0.8);
+}
+
+.price-row.higher .last-sale-date {
+    color: rgba(239, 68, 68, 0.8);
+}
+
+/* Estilos para o novo campo de busca por nome */
+#productNameInput {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid var(--border-dark);
+    border-radius: var(--radius);
+    background: var(--input-dark);
+    color: var(--text-dark);
+    font-size: 1rem;
+    transition: var(--transition);
+}
+
+body.light-mode #productNameInput {
+    background: var(--input-light);
+    color: var(--text-light);
+    border: 2px solid var(--border-light);
+}
+
+#productNameInput:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79,70,229,0.13);
+}
+
+/* Ajustes responsivos */
+@media (max-width: 768px) {
+    .market-info {
+        align-items: flex-start;
+    }
+    
+    .last-sale-date {
+        font-size: 0.75rem;
+    }
+}
