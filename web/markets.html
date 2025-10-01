@@ -55,6 +55,12 @@
             background: var(--hover-color);
         }
 
+        /* Estilo para a coluna de endereço */
+        #marketsTable td:nth-child(3) {
+            max-width: 250px;
+            word-wrap: break-word;
+        }
+
         /* Container das ações - mantido para alinhamento */
         .actions {
             display: flex;
@@ -63,7 +69,7 @@
             flex-wrap: wrap;
         }
 
-        /* Responsividade para ações */
+        /* Responsividade para ações e tabela */
         @media (max-width: 768px) {
             .actions {
                 flex-direction: column;
@@ -74,6 +80,15 @@
                 padding: 6px 12px;
                 font-size: 13px;
                 justify-content: center;
+            }
+
+            #marketsTable {
+                display: block;
+                overflow-x: auto;
+            }
+
+            #marketsTable td:nth-child(3) {
+                max-width: 150px;
             }
         }
     </style>
@@ -167,9 +182,9 @@
                             <input type="text" id="marketCnpj" placeholder="Apenas números">
                         </div>
                         <div class="form-group">
-    <label for="marketAddress">Endereço</label>
-    <input type="text" id="marketAddress" placeholder="Ex: Av. Fernandes Lima, 1000 - Farol, Maceió/AL">
-</div>
+                            <label for="marketAddress">Endereço</label>
+                            <input type="text" id="marketAddress" placeholder="Ex: Av. Fernandes Lima, 1000 - Farol, Maceió/AL">
+                        </div>
                         <div class="form-actions">
                             <button id="saveButton" class="btn">
                                 <i class="fas fa-save"></i> Salvar
@@ -187,12 +202,13 @@
                                 <tr>
                                     <th>Nome</th>
                                     <th>CNPJ</th>
+                                    <th>Endereço</th>
                                     <th>Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td colspan="3" style="text-align: center; padding: 2rem;">
+                                    <td colspan="4" style="text-align: center; padding: 2rem;">
                                         <i class="fas fa-spinner fa-spin"></i> Carregando mercados...
                                     </td>
                                 </tr>
@@ -203,12 +219,7 @@
             </div>
         </div>
     </div>
-      <script src="mobile-menu.js"></script>
-    <script src="user-menu.js"></script>
+    <script src="mobile-menu.js"></script>
     <script src="markets.js"></script>
 </body>
 </html>
-
-
-
-
