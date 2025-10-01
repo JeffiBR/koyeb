@@ -4317,3 +4317,538 @@ body.light-mode .stat:nth-child(3) {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
 }
+
+/* ====== MELHORIAS PARA A SEÇÃO DE RESUMO DA COMPARAÇÃO ====== */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+.summary-card {
+    background: linear-gradient(135deg, var(--panel-dark), rgba(15, 23, 36, 0.9));
+    border-radius: 20px;
+    padding: 2rem;
+    border: 1px solid var(--border-dark);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+body.light-mode .summary-card {
+    background: linear-gradient(135deg, var(--panel-light), rgba(255, 255, 255, 0.9));
+    border: 1px solid var(--border-light);
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.summary-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    transform: scaleX(0);
+    transition: transform 0.4s ease;
+}
+
+.summary-card:hover::before {
+    transform: scaleX(1);
+}
+
+.summary-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.15),
+        0 8px 32px rgba(79, 70, 229, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+body.light-mode .summary-card:hover {
+    box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.08),
+        0 8px 32px rgba(79, 70, 229, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.summary-card-content {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    position: relative;
+    z-index: 2;
+}
+
+.summary-icon {
+    width: 70px;
+    height: 70px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: white;
+    box-shadow: 
+        0 8px 20px rgba(79, 70, 229, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.summary-card:hover .summary-icon {
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 
+        0 12px 30px rgba(79, 70, 229, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.summary-icon::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.6s ease;
+}
+
+.summary-card:hover .summary-icon::before {
+    left: 100%;
+}
+
+.summary-info {
+    flex: 1;
+}
+
+.summary-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--text-dark);
+    line-height: 1;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--text-dark), var(--primary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+body.light-mode .summary-value {
+    background: linear-gradient(135deg, var(--text-light), var(--primary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.summary-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--muted-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+body.light-mode .summary-label {
+    color: var(--muted-light);
+}
+
+/* Cores específicas para cada card */
+.summary-card:nth-child(1) .summary-icon {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+}
+
+.summary-card:nth-child(2) .summary-icon {
+    background: linear-gradient(135deg, #10b981, #34d399);
+}
+
+.summary-card:nth-child(3) .summary-icon {
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+}
+
+.summary-card:nth-child(4) .summary-icon {
+    background: linear-gradient(135deg, #ef4444, #f87171);
+}
+
+/* Efeito de partículas flutuantes */
+.summary-card::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(79, 70, 229, 0.1) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.summary-card:hover::after {
+    opacity: 1;
+}
+
+/* ====== MELHORIAS PARA OS CARDS DE PRODUTO ====== */
+.product-comparison-card {
+    background: var(--panel-dark);
+    border-radius: 20px;
+    border: 1px solid var(--border-dark);
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    margin-bottom: 1.5rem;
+}
+
+body.light-mode .product-comparison-card {
+    background: var(--panel-light);
+    border: 1px solid var(--border-light);
+}
+
+.product-comparison-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+    border-color: rgba(79, 70, 229, 0.3);
+}
+
+.product-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 2rem;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.05), transparent);
+    border-bottom: 1px solid var(--border-dark);
+    position: relative;
+}
+
+body.light-mode .product-header {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.02), transparent);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.product-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--primary), var(--accent));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.product-comparison-card:hover .product-header::before {
+    opacity: 1;
+}
+
+.product-main-info {
+    flex: 1;
+}
+
+.product-name {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 0.75rem;
+    line-height: 1.3;
+}
+
+body.light-mode .product-name {
+    color: var(--text-light);
+}
+
+.product-barcode {
+    font-size: 0.9rem;
+    color: var(--muted-dark);
+    font-family: 'Courier New', monospace;
+    background: rgba(0, 0, 0, 0.1);
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    display: inline-block;
+    border: 1px solid var(--border-dark);
+}
+
+body.light-mode .product-barcode {
+    color: var(--muted-light);
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border-light);
+}
+
+.product-stats {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.75rem;
+    text-align: right;
+}
+
+.market-count {
+    font-size: 0.9rem;
+    color: var(--muted-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    border: 1px solid var(--border-dark);
+}
+
+body.light-mode .market-count {
+    color: var(--muted-light);
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border-light);
+}
+
+.lowest-price {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--success);
+    background: rgba(22, 163, 74, 0.1);
+    padding: 0.75rem 1.25rem;
+    border-radius: 12px;
+    border: 1px solid rgba(22, 163, 74, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.lowest-price::before {
+    content: '🏆';
+    font-size: 1rem;
+}
+
+/* ====== MELHORIAS PARA AS LINHAS DE PREÇO ====== */
+.prices-comparison {
+    padding: 0;
+}
+
+.price-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 2rem;
+    border-bottom: 1px solid var(--border-dark);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+body.light-mode .price-row {
+    border-bottom: 1px solid var(--border-light);
+}
+
+.price-row:last-child {
+    border-bottom: none;
+}
+
+.price-row::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: linear-gradient(90deg, rgba(79, 70, 229, 0.05), transparent);
+    transition: width 0.3s ease;
+}
+
+.price-row:hover::before {
+    width: 100%;
+}
+
+.price-row.lowest {
+    background: rgba(22, 163, 74, 0.05);
+    border-left: 4px solid var(--success);
+}
+
+.price-row.higher {
+    background: rgba(239, 68, 68, 0.03);
+}
+
+.price-row.unavailable {
+    background: rgba(156, 163, 175, 0.05);
+    color: var(--muted-dark);
+}
+
+.market-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+}
+
+.market-name {
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 1rem;
+}
+
+body.light-mode .market-name {
+    color: var(--text-light);
+}
+
+.price-row.unavailable .market-name {
+    color: var(--muted-dark);
+}
+
+.price-info {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.price-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    min-width: 100px;
+    text-align: right;
+}
+
+body.light-mode .price-value {
+    color: var(--text-light);
+}
+
+.price-row.lowest .price-value {
+    color: var(--success);
+    text-shadow: 0 0 20px rgba(22, 163, 74, 0.3);
+}
+
+.price-row.higher .price-value {
+    color: var(--error);
+}
+
+.price-row.unavailable .price-value {
+    color: var(--muted-dark);
+    font-weight: normal;
+}
+
+.price-difference {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--error);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    min-width: 80px;
+    text-align: center;
+}
+
+.best-price-tag {
+    background: rgba(22, 163, 74, 0.1);
+    color: var(--success);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid rgba(22, 163, 74, 0.2);
+    min-width: 80px;
+    text-align: center;
+}
+
+/* ====== ANIMAÇÕES ====== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.summary-card {
+    animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.summary-card:nth-child(1) { animation-delay: 0.1s; }
+.summary-card:nth-child(2) { animation-delay: 0.2s; }
+.summary-card:nth-child(3) { animation-delay: 0.3s; }
+.summary-card:nth-child(4) { animation-delay: 0.4s; }
+
+@keyframes pulseGlow {
+    0%, 100% {
+        box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
+    }
+    50% {
+        box-shadow: 0 8px 30px rgba(79, 70, 229, 0.5);
+    }
+}
+
+.summary-card:hover .summary-icon {
+    animation: pulseGlow 2s infinite;
+}
+
+/* ====== RESPONSIVIDADE ====== */
+@media (max-width: 768px) {
+    .summary-cards {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+    
+    .summary-card {
+        padding: 1.5rem;
+    }
+    
+    .summary-card-content {
+        gap: 1rem;
+    }
+    
+    .summary-icon {
+        width: 60px;
+        height: 60px;
+        font-size: 1.5rem;
+    }
+    
+    .summary-value {
+        font-size: 2rem;
+    }
+    
+    .product-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+    
+    .product-stats {
+        align-items: flex-start;
+        text-align: left;
+        width: 100%;
+    }
+    
+    .price-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1.5rem;
+    }
+    
+    .price-info {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+@media (max-width: 480px) {
+    .summary-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .summary-card-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+    
+    .summary-value {
+        font-size: 1.8rem;
+    }
+}
