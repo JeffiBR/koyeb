@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comparar Preços - Histórico</title>
+    <title>Comparador de Preços - Tempo Real</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -88,17 +88,17 @@
                 <main class="admin-panel">
                     <div class="panel-header">
                         <i class="fas fa-chart-bar"></i>
-                        <h2>Comparador de Preços</h2>
+                        <h2>Comparador de Preços - Tempo Real</h2>
                     </div>
-                    <p class="panel-description">Compare a evolução dos preços de produtos por código de barras entre diferentes mercados.</p>
+                    <p class="panel-description">Compare preços atuais de produtos por código de barras entre diferentes mercados.</p>
                     
                     <div class="form-container">
                         <div class="form-group full-width">
                             <label for="barcodesInput">Códigos de Barras (até 10, separados por vírgula)</label>
-                            <textarea id="barcodesInput" placeholder="Ex: 7891234567890, 7899876543210, 7895555555555" rows="3"></textarea>
+                            <textarea id="barcodesInput" placeholder="Ex: 7896012300268, 7897261800011, 7891234567890" rows="3"></textarea>
                             <div class="input-info">
                                 <i class="fas fa-info-circle"></i>
-                                <span>Insite até 10 códigos de barras separados por vírgula</span>
+                                <span>Insira até 10 códigos de barras separados por vírgula</span>
                             </div>
                         </div>
 
@@ -142,106 +142,66 @@
                         </div>
 
                         <button id="compareButton" class="btn full-width">
-                            <i class="fas fa-chart-line"></i> Comparar Preços
+                            <i class="fas fa-search-dollar"></i> Buscar Preços em Tempo Real
                         </button>
                     </div>
                     
                     <!-- Loading State -->
-                    <div id="loadingContainer" class="loader-container" style="display: none;">
+                    <div id="loader" class="loader-container" style="display: none;">
                         <div class="loader"></div>
-                        <p>Buscando dados de preços...</p>
+                        <p>Buscando preços atuais...</p>
                     </div>
 
-                    <!-- Gráfico Principal -->
-                    <div class="chart-container" id="chartContainer" style="display: none;">
-                        <canvas id="priceChart"></canvas>
-                    </div>
-
-                    <!-- Infográfico -->
-                    <div id="infographicContainer" class="infographic-container" style="display: none;">
+                    <!-- Resultados -->
+                    <div id="resultsContainer" style="display: none;">
                         <div class="panel-header">
-                            <i class="fas fa-chart-pie"></i>
-                            <h3>Análise Comparativa</h3>
+                            <i class="fas fa-list-alt"></i>
+                            <h3>Resultados da Comparação</h3>
                         </div>
                         
+                        <!-- Sumário -->
                         <div class="summary-cards">
                             <div class="card">
-                                <div class="card-icon"><i class="fas fa-tags"></i></div>
-                                <div class="card-title">Produtos Analisados</div>
-                                <p id="totalProducts">0</p>
+                                <div class="card-icon"><i class="fas fa-barcode"></i></div>
+                                <div class="card-title">Produtos Encontrados</div>
+                                <p id="foundProducts">0</p>
                             </div>
                             <div class="card">
                                 <div class="card-icon"><i class="fas fa-store"></i></div>
-                                <div class="card-title">Mercados Incluídos</div>
-                                <p id="totalMarkets">0</p>
-                            </div>
-                            <div class="card">
-                                <div class="card-icon"><i class="fas fa-calendar"></i></div>
-                                <div class="card-title">Período Analisado</div>
-                                <p id="analysisPeriod">-</p>
+                                <div class="card-title">Mercados com Preços</div>
+                                <p id="activeMarkets">0</p>
                             </div>
                             <div class="card">
                                 <div class="card-icon"><i class="fas fa-percentage"></i></div>
-                                <div class="card-title">Maior Variação</div>
-                                <p id="maxVariation">-</p>
+                                <div class="card-title">Maior Economia</div>
+                                <p id="maxSaving">-</p>
+                            </div>
+                            <div class="card">
+                                <div class="card-icon"><i class="fas fa-clock"></i></div>
+                                <div class="card-title">Última Atualização</div>
+                                <p id="lastUpdate">-</p>
                             </div>
                         </div>
 
-                        <div class="infographic-grid">
-                            <div class="infographic-card">
-                                <h4><i class="fas fa-trophy"></i> Melhores Preços Atuais</h4>
-                                <div id="bestPricesList" class="prices-list">
-                                    <!-- Lista de melhores preços -->
-                                </div>
-                            </div>
-                            
-                            <div class="infographic-card">
-                                <h4><i class="fas fa-chart-line"></i> Tendências</h4>
-                                <div id="trendsList" class="trends-list">
-                                    <!-- Lista de tendências -->
-                                </div>
-                            </div>
-                            
-                            <div class="infographic-card">
-                                <h4><i class="fas fa-exclamation-triangle"></i> Alertas</h4>
-                                <div id="alertsList" class="alerts-list">
-                                    <!-- Lista de alertas -->
-                                </div>
-                            </div>
+                        <!-- Lista de Produtos -->
+                        <div id="productsList" class="products-list">
+                            <!-- Produtos serão inseridos aqui -->
                         </div>
                     </div>
 
-                    <!-- Tabela de Dados Detalhados -->
-                    <div id="dataTableContainer" class="table-container" style="display: none; margin-top: 2rem;">
-                        <div class="panel-header">
-                            <i class="fas fa-table"></i>
-                            <h3>Dados Detalhados</h3>
-                        </div>
-                        <table id="dataTable">
-                            <thead>
-                                <tr>
-                                    <th>Produto</th>
-                                    <th>Código</th>
-                                    <th>Mercado</th>
-                                    <th>Preço Atual</th>
-                                    <th>Variação</th>
-                                    <th>Última Atualização</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Dados serão preenchidos via JavaScript -->
-                            </tbody>
-                        </table>
+                    <!-- Estado Vazio -->
+                    <div id="emptyState" class="empty-state" style="display: none;">
+                        <i class="fas fa-search"></i>
+                        <h3>Nenhum dado encontrado</h3>
+                        <p>Execute uma busca para ver os resultados de comparação</p>
                     </div>
                 </main>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="compare.js"></script>
+      <script src="mobile-menu.js"></script>
     <script src="user-menu.js"></script>
-    <script src="admin.js"></script>
 </body>
 </html>
