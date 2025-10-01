@@ -3976,3 +3976,344 @@ body.light-mode #barcodesInput {
         justify-content: space-between;
     }
 }
+
+/* ====== SEÇÃO DE RESUMO DE COMPARAÇÃO - ESTILO PROFISSIONAL ====== */
+.results-summary {
+    background: linear-gradient(135deg, 
+        rgba(79, 70, 229, 0.08) 0%, 
+        rgba(124, 58, 237, 0.05) 50%, 
+        rgba(79, 70, 229, 0.08) 100%);
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin: 2rem 0;
+    border: 1px solid rgba(79, 70, 229, 0.15);
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+body.light-mode .results-summary {
+    background: linear-gradient(135deg, 
+        rgba(79, 70, 229, 0.05) 0%, 
+        rgba(124, 58, 237, 0.03) 50%, 
+        rgba(79, 70, 229, 0.05) 100%);
+    border: 1px solid rgba(79, 70, 229, 0.1);
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* Efeito de brilho sutil no fundo */
+.results-summary::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(
+        circle at center,
+        rgba(79, 70, 229, 0.1) 0%,
+        transparent 70%
+    );
+    animation: rotateGradient 15s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes rotateGradient {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.summary-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    position: relative;
+    z-index: 2;
+}
+
+.stat {
+    text-align: center;
+    padding: 1.25rem 1rem;
+    background: var(--panel-dark);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+body.light-mode .stat {
+    background: var(--panel-light);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.stat:hover {
+    transform: translateY(-3px);
+    border-color: rgba(79, 70, 229, 0.3);
+    box-shadow: 
+        0 8px 30px rgba(79, 70, 229, 0.15),
+        0 2px 8px rgba(79, 70, 229, 0.1);
+}
+
+/* Efeito de brilho no hover */
+.stat::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.1),
+        transparent
+    );
+    transition: left 0.6s ease;
+}
+
+.stat:hover::before {
+    left: 100%;
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    position: relative;
+}
+
+/* Ícones decorativos para cada stat */
+.stat:nth-child(1) .stat-value::before {
+    content: '📦';
+    font-size: 1.5rem;
+    margin-right: 0.5rem;
+    filter: grayscale(0.3);
+}
+
+.stat:nth-child(2) .stat-value::before {
+    content: '🏪';
+    font-size: 1.5rem;
+    margin-right: 0.5rem;
+    filter: grayscale(0.3);
+}
+
+.stat:nth-child(3) .stat-value::before {
+    content: '💰';
+    font-size: 1.5rem;
+    margin-right: 0.5rem;
+    filter: grayscale(0.3);
+}
+
+.stat:nth-child(4) .stat-value::before {
+    content: '🕐';
+    font-size: 1.5rem;
+    margin-right: 0.5rem;
+    filter: grayscale(0.3);
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: var(--muted-dark);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    line-height: 1.3;
+    display: block;
+}
+
+body.light-mode .stat-label {
+    color: var(--muted-light);
+}
+
+/* Destaque especial para a maior economia */
+.stat:nth-child(3) {
+    background: linear-gradient(135deg, 
+        rgba(22, 163, 74, 0.08), 
+        rgba(34, 197, 94, 0.05));
+    border-color: rgba(22, 163, 74, 0.2);
+}
+
+.stat:nth-child(3) .stat-value {
+    background: linear-gradient(135deg, #16a34a, #22c55e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+body.light-mode .stat:nth-child(3) {
+    background: linear-gradient(135deg, 
+        rgba(22, 163, 74, 0.05), 
+        rgba(34, 197, 94, 0.03));
+}
+
+/* Badge de destaque para economia */
+.stat:nth-child(3)::after {
+    content: '✨';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    font-size: 1rem;
+    animation: sparkle 2s ease-in-out infinite;
+}
+
+@keyframes sparkle {
+    0%, 100% { opacity: 0.7; transform: scale(1) rotate(0deg); }
+    50% { opacity: 1; transform: scale(1.1) rotate(10deg); }
+}
+
+/* ====== RESPONSIVIDADE ====== */
+@media (max-width: 1024px) {
+    .summary-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+    
+    .stat {
+        padding: 1.5rem 1rem;
+    }
+    
+    .stat-value {
+        font-size: 1.6rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .results-summary {
+        padding: 1.25rem;
+        margin: 1.5rem 0;
+        border-radius: 16px;
+    }
+    
+    .summary-stats {
+        grid-template-columns: 1fr;
+        gap: 0.875rem;
+    }
+    
+    .stat {
+        padding: 1.25rem 1rem;
+        border-radius: 14px;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .results-summary {
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .stat {
+        padding: 1rem 0.875rem;
+    }
+    
+    .stat-value {
+        font-size: 1.4rem;
+    }
+    
+    .stat-value::before {
+        font-size: 1.25rem !important;
+        margin-right: 0.375rem !important;
+    }
+}
+
+/* ====== ANIMAÇÕES DE ENTRADA ====== */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.stat {
+    animation: slideInUp 0.5s ease forwards;
+    opacity: 0;
+}
+
+.stat:nth-child(1) { animation-delay: 0.1s; }
+.stat:nth-child(2) { animation-delay: 0.2s; }
+.stat:nth-child(3) { animation-delay: 0.3s; }
+.stat:nth-child(4) { animation-delay: 0.4s; }
+
+/* ====== INDICADOR DE ATUALIZAÇÃO EM TEMPO REAL ====== */
+.stat:last-child .stat-value::after {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--success);
+    border-radius: 50%;
+    margin-left: 0.5rem;
+    animation: pulse 2s infinite;
+    vertical-align: middle;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(0.8); }
+}
+
+/* ====== MODO DE ALTO CONTRASTE ====== */
+@media (prefers-contrast: high) {
+    .results-summary {
+        border-width: 2px;
+        background: var(--panel-dark);
+    }
+    
+    .stat {
+        border-width: 2px;
+        background: var(--input-dark);
+    }
+    
+    body.light-mode .results-summary {
+        background: var(--panel-light);
+    }
+    
+    body.light-mode .stat {
+        background: var(--input-light);
+    }
+}
+
+/* ====== MELHORIAS DE ACESSIBILIDADE ====== */
+@media (prefers-reduced-motion: reduce) {
+    .results-summary::before,
+    .stat::before,
+    .stat,
+    .stat-value::after {
+        animation: none;
+    }
+    
+    .stat:hover {
+        transform: none;
+    }
+}
+
+/* Foco para acessibilidade */
+.stat:focus-within {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
