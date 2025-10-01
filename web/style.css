@@ -4909,6 +4909,7 @@ body.light-mode #productNameInput {
 }
 
 
+
 /* Estilos para a busca em tempo real no comparador */
 .search-results-dropdown {
     position: absolute;
@@ -5082,5 +5083,20 @@ body.light-mode .product-name {
     .select-product-btn {
         align-self: flex-end;
         margin-top: -2.5rem;
+    }
+}
+
+/* Ajuste para 4 colunas na tabela */
+#marketsTable th:nth-child(3),
+#marketsTable td:nth-child(3) {
+    max-width: 250px;
+    word-wrap: break-word;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    #marketsTable th:nth-child(3),
+    #marketsTable td:nth-child(3) {
+        max-width: 150px;
     }
 }
