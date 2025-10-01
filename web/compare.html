@@ -97,20 +97,36 @@
                             <h3>Configuração da Comparação</h3>
                         </div>
                         <div class="card-content">
-                            <!-- Campo único para busca -->
                             <div class="form-group">
-                                <label for="searchInput">
-                                    <i class="fas fa-search"></i>
-                                    Código de Barras ou Nome do Produto
+                                <label for="barcodesInput">
+                                    <i class="fas fa-barcode"></i>
+                                    Códigos de Barras
                                 </label>
                                 <textarea 
-                                    id="searchInput" 
-                                    placeholder="Digite códigos de barras (separados por vírgula) ou nome do produto. Ex: 7891234567890, carne, alface"
+                                    id="barcodesInput" 
+                                    placeholder="Digite os códigos de barras separados por vírgula. Máximo: 10 códigos."
                                     rows="4"
                                 ></textarea>
                                 <div class="input-info">
                                     <i class="fas fa-info-circle"></i>
-                                    Para códigos de barras: até 10 códigos separados por vírgula. Para produtos pesáveis: digite o nome.
+                                    Insira até 10 códigos de barras separados por vírgula
+                                </div>
+                            </div>
+
+                            <!-- Novo campo para busca por nome -->
+                            <div class="form-group">
+                                <label for="productNameInput">
+                                    <i class="fas fa-search"></i>
+                                    Nome do Produto
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="productNameInput" 
+                                    placeholder="Digite o nome do produto para busca (ex: carne, alface, tomate)"
+                                >
+                                <div class="input-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    Use para buscar produtos pesáveis como carnes, frutas e verduras
                                 </div>
                             </div>
 
