@@ -3700,3 +3700,209 @@ body.light-mode .user-role.user-role {
 .user-dropdown.active {
     animation: slideInDown 0.2s ease-out;
 }
+
+/* Estilos para o comparador aprimorado */
+.input-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--muted-dark);
+}
+
+.input-info i {
+    color: var(--primary);
+}
+
+#barcodesInput {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid var(--border-dark);
+    border-radius: var(--radius);
+    background: var(--input-dark);
+    color: var(--text-dark);
+    font-size: 1rem;
+    transition: var(--transition);
+    resize: vertical;
+    min-height: 100px;
+    font-family: monospace;
+}
+
+body.light-mode #barcodesInput {
+    background: var(--input-light);
+    color: var(--text-light);
+    border: 2px solid var(--border-light);
+}
+
+#barcodesInput:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79,70,229,0.13);
+}
+
+/* Infográfico */
+.infographic-container {
+    margin-top: 2rem;
+}
+
+.infographic-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.infographic-card {
+    background: var(--panel-dark);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    border: 1px solid var(--border-dark);
+}
+
+body.light-mode .infographic-card {
+    background: var(--panel-light);
+    border: 1px solid var(--border-light);
+}
+
+.infographic-card h4 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-dark);
+    font-size: 1.1rem;
+}
+
+body.light-mode .infographic-card h4 {
+    color: var(--text-light);
+}
+
+/* Listas do infográfico */
+.prices-list, .trends-list, .alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.price-item, .trend-item, .alert-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: var(--input-dark);
+    border-left: 4px solid var(--primary);
+}
+
+body.light-mode .price-item,
+body.light-mode .trend-item,
+body.light-mode .alert-item {
+    background: var(--input-light);
+}
+
+.price-item {
+    border-left-color: var(--success);
+}
+
+.trend-item.trend-alta {
+    border-left-color: var(--error);
+}
+
+.trend-item.trend-baixa {
+    border-left-color: var(--success);
+}
+
+.trend-item.trend-estável {
+    border-left-color: var(--warn);
+}
+
+.alert-item {
+    border-left-color: var(--error);
+}
+
+.alert-item.no-alerts {
+    border-left-color: var(--success);
+    justify-content: center;
+}
+
+.price-item strong {
+    flex: 1;
+    font-size: 0.9rem;
+}
+
+.price-item span {
+    font-weight: 700;
+    color: var(--primary);
+    margin-right: 0.5rem;
+}
+
+.price-item small {
+    font-size: 0.8rem;
+    color: var(--muted-dark);
+}
+
+.trend-item, .alert-item {
+    gap: 0.75rem;
+}
+
+.trend-item i, .alert-item i {
+    width: 16px;
+}
+
+/* Tabela de dados */
+.change-positive {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.change-negative {
+    color: var(--error);
+    font-weight: 600;
+}
+
+/* Loader */
+.loader-container {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    text-align: center;
+}
+
+.loader {
+    border: 4px solid var(--border-dark);
+    border-top: 4px solid var(--primary);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .infographic-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .summary-cards {
+        grid-template-columns: 1fr 1fr;
+    }
+    
+    .price-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+    
+    .price-item span {
+        margin-right: 0;
+    }
+}
