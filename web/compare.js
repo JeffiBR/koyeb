@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Elementos principais
-    const searchInput = document.getElementById('searchInput');
+    const barcodesInput = document.getElementById('barcodesInput');
+    const productNameInput = document.getElementById('productNameInput');
     const supermarketGrid = document.getElementById('supermarketGrid');
     const compareButton = document.getElementById('compareButton');
     const resultsContainer = document.getElementById('resultsContainer');
@@ -88,15 +89,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateCompareButtonState() {
-        const hasSearchTerm = searchInput.value.trim().length > 0;
+        const hasBarcodes = barcodesInput.value.trim().length > 0;
+        const hasProductName = productNameInput.value.trim().length > 0;
         const hasMarkets = selectedMarkets.size >= 2;
         
-        compareButton.disabled = !(hasSearchTerm && hasMarkets);
+        compareButton.disabled = !((hasBarcodes || hasProductName) && hasMarkets);
     }
 
     function setupEventListeners() {
-        // Busca em tempo real no campo único
-        searchInput.addEventListener('input', debounce(validateInputs, 500));
+        // Busca em tempo real nos códigos de barras e nome do produto
+        barcodesInput.addEventListener('input', debounce(validateInputs, 500));
+        productNameInput.addEventListener('input', debounce(validateInputs, 500));
         
         // Busca em mercados
         marketSearch.addEventListener('input', debounce(filterMarkets, 300));
@@ -111,23 +114,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function validateInputs() {
-        const searchText = searchInput.value.trim();
+        const barcodesText = barcodesInput.value.trim();
+        const productName = productNameInput.value.trim();
         
-        if (searchText) {
-            // Se contém vírgulas, trata como múltiplos códigos de barras
-            if (searchText.includes(',')) {
-                const items = searchText.split(',').map(b => b.trim()).filter(b => b);
-                
-                if (items.length > 10) {
-                    showNotification('Máximo de 10 itens permitidos', 'warning');
-                    searchInput.value = items.slice(0, 10).join(', ');
-                }
-                
-                // Valida formato básico de código de barras (apenas números)
-                const invalidBarcodes = items.filter(b => b && !/^\d+$/.test(b));
-                if (invalidBarcodes.length > 0) {
-                    showNotification(`Itens inválidos (apenas números para códigos): ${invalidBarcodes.join(', ')}`, 'error');
-                }
+        if (barcodesText) {
+            const barcodes = barcodesText.split(',').map(b => b.trim()).filter(b => b);
+            
+            if (barcodes.length > 10) {
+                showNotification('Máximo de 10 códigos de barras permitidos', 'warning');
+                barcodesInput.value = barcodes.slice(0, 10).join(', ');
+            }
+            
+            // Valida formato básico de código de barras (apenas números)
+            const invalidBarcodes = barcodes.filter(b => !/^\d+$/.test(b));
+            if (invalidBarcodes.length > 0) {
+                showNotification(`Códigos inválidos: ${invalidBarcodes.join(', ')}`, 'error');
             }
         }
         
@@ -167,11 +168,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function searchCurrentPrices() {
-        const searchText = searchInput.value.trim();
+        const barcodesText = barcodesInput.value.trim();
+        const productName = productNameInput.value.trim();
         const selectedCnpjs = Array.from(selectedMarkets);
         
-        if (!searchText) {
-            showNotification('Insira códigos de barras ou nomes de produtos', 'error');
+        if (!barcodesText && !productName) {
+            showNotification('Insira códigos de barras ou nome do produto', 'error');
             return;
         }
         
@@ -179,6 +181,8 @@ document.addEventListener('DOMContentLoaded', () => {
             showNotification('Selecione pelo menos dois mercados', 'error');
             return;
         }
+
+        const barcodes = barcodesText ? barcodesText.split(',').map(b => b.trim()).filter(b => b) : [];
 
         loader.style.display = 'flex';
         resultsContainer.style.display = 'none';
@@ -193,14 +197,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             currentResults = [];
             
-            // Processar os itens de busca (separados por vírgula)
-            const searchItems = searchText.split(',').map(item => item.trim()).filter(item => item);
+            // Buscar por códigos de barras
+            for (const barcode of barcodes) {
+                const productData = await fetchProductPrices(barcode, selectedCnpjs, session, 'barcode');
+                if (productData && productData.prices.length > 0) {
+                    currentResults.push(productData);
+                }
+            }
             
-            for (const searchItem of searchItems) {
-                // Determinar se é código de barras (apenas números) ou nome
-                const searchType = /^\d+$/.test(searchItem) ? 'barcode' : 'name';
-                const productData = await fetchProductPrices(searchItem, selectedCnpjs, session, searchType);
-                
+            // Buscar por nome do produto
+            if (productName) {
+                const productData = await fetchProductPrices(productName, selectedCnpjs, session, 'name');
                 if (productData && productData.prices.length > 0) {
                     currentResults.push(productData);
                 }
@@ -302,7 +309,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 productsData.push({
                     barcode: productInfo.codigo_barras,
                     searchTerm: searchTerm,
-                    searchType: searchType,
                     productInfo: productInfo,
                     prices: prices.sort((a, b) => a.price - b.price),
                     lowestPrice: validPrices.length > 0 ? Math.min(...validPrices.map(p => p.price)) : 0
@@ -353,13 +359,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const hasPrices = productData.prices.some(p => p.price > 0);
         const availableMarkets = productData.prices.filter(p => p.price > 0).length;
-        const searchTypeLabel = productData.searchType === 'barcode' ? `Código: ${productData.barcode}` : `Produto: ${productData.searchTerm}`;
         
         card.innerHTML = `
             <div class="product-header">
                 <div class="product-main-info">
                     <h4 class="product-name">${productData.productInfo.nome}</h4>
-                    <div class="product-barcode">${searchTypeLabel}</div>
+                    <div class="product-barcode">${productData.barcode ? `Código: ${productData.barcode}` : 'Produto por nome'}</div>
                 </div>
                 <div class="product-stats">
                     <span class="market-count">${availableMarkets} mercados</span>
