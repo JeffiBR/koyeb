@@ -1,73 +1,142 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const productNameInput = document.getElementById('productNameInput');
-    const searchResults = document.getElementById('searchResults');
-    
-    // Criar container para resultados se não existir
-    if (!searchResults) {
-        const resultsContainer = document.createElement('div');
-        resultsContainer.id = 'searchResults';
-        resultsContainer.className = 'search-results-dropdown';
-        productNameInput.parentNode.appendChild(resultsContainer);
+// Script específico para busca em tempo real por nome no comparador
+class ProductNameSearch {
+    constructor() {
+        this.currentSearchTerm = '';
+        this.searchTimeout = null;
+        this.selectedMarkets = new Set();
+        this.init();
     }
 
-    let currentSearchTerm = '';
-    let searchTimeout = null;
+    init() {
+        this.productNameInput = document.getElementById('productNameInput');
+        if (!this.productNameInput) {
+            console.error('Campo productNameInput não encontrado');
+            return;
+        }
 
-    // Configurar evento de input com debounce
-    productNameInput.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.trim();
+        this.createResultsContainer();
+        this.setupEventListeners();
+        this.loadSelectedMarkets();
+    }
+
+    createResultsContainer() {
+        // Remove container existente se houver
+        const existingContainer = document.getElementById('searchResultsDropdown');
+        if (existingContainer) {
+            existingContainer.remove();
+        }
+
+        // Cria novo container
+        this.resultsContainer = document.createElement('div');
+        this.resultsContainer.id = 'searchResultsDropdown';
+        this.resultsContainer.className = 'search-results-dropdown';
         
+        // Insere após o campo de input
+        this.productNameInput.parentNode.appendChild(this.resultsContainer);
+    }
+
+    setupEventListeners() {
+        // Input com debounce
+        this.productNameInput.addEventListener('input', (e) => {
+            this.handleInput(e.target.value.trim());
+        });
+
+        // Fechar resultados ao clicar fora
+        document.addEventListener('click', (e) => {
+            if (!this.productNameInput.contains(e.target) && 
+                !this.resultsContainer.contains(e.target)) {
+                this.hideResults();
+            }
+        });
+
+        // Navegação com teclado
+        this.productNameInput.addEventListener('keydown', (e) => {
+            this.handleKeydown(e);
+        });
+    }
+
+    loadSelectedMarkets() {
+        // Tenta obter os mercados selecionados do compare.js
+        try {
+            const marketCards = document.querySelectorAll('.market-card.selected');
+            this.selectedMarkets = new Set();
+            
+            marketCards.forEach(card => {
+                const cnpj = card.querySelector('.market-cnpj')?.textContent;
+                if (cnpj) {
+                    this.selectedMarkets.add(cnpj);
+                }
+            });
+            
+            console.log('Mercados selecionados para busca:', this.selectedMarkets.size);
+        } catch (error) {
+            console.warn('Não foi possível carregar mercados selecionados:', error);
+        }
+    }
+
+    handleInput(searchTerm) {
         // Limpar timeout anterior
-        if (searchTimeout) {
-            clearTimeout(searchTimeout);
+        if (this.searchTimeout) {
+            clearTimeout(this.searchTimeout);
         }
 
         // Esconder resultados se busca estiver vazia
         if (searchTerm.length === 0) {
-            hideResults();
+            this.hideResults();
             return;
         }
 
-        // Aguardar 500ms antes de buscar (debounce)
-        searchTimeout = setTimeout(() => {
-            performRealtimeSearch(searchTerm);
-        }, 500);
-    });
+        // Atualizar mercados selecionados
+        this.loadSelectedMarkets();
 
-    // Esconder resultados ao clicar fora
-    document.addEventListener('click', (e) => {
-        if (!productNameInput.contains(e.target) && !searchResults.contains(e.target)) {
-            hideResults();
+        // Verificar se há mercados selecionados
+        if (this.selectedMarkets.size === 0) {
+            this.showMessage('Selecione pelo menos um mercado para buscar');
+            return;
         }
-    });
 
-    // Tecla Escape para fechar resultados
-    productNameInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            hideResults();
-            productNameInput.blur();
+        // Aguardar antes de buscar (debounce)
+        this.searchTimeout = setTimeout(() => {
+            this.performSearch(searchTerm);
+        }, 600);
+    }
+
+    handleKeydown(e) {
+        switch (e.key) {
+            case 'Escape':
+                this.hideResults();
+                this.productNameInput.blur();
+                break;
+            case 'ArrowDown':
+                e.preventDefault();
+                this.focusFirstResult();
+                break;
+            case 'Enter':
+                if (this.currentSearchTerm.length >= 3) {
+                    this.performSearch(this.currentSearchTerm);
+                }
+                break;
         }
-    });
+    }
 
-    async function performRealtimeSearch(searchTerm) {
+    async performSearch(searchTerm) {
         if (searchTerm.length < 3) {
-            hideResults();
+            this.showMessage('Digite pelo menos 3 caracteres');
             return;
         }
 
-        currentSearchTerm = searchTerm;
+        this.currentSearchTerm = searchTerm;
 
         try {
-            const session = await getSession();
+            this.showLoading();
+
+            const session = await this.getSession();
             if (!session) {
-                showNotification('Você precisa estar logado para realizar buscas', 'error');
+                this.showMessage('Você precisa estar logado para buscar');
                 return;
             }
 
-            // Mostrar loading
-            showLoadingState();
-
-            const response = await authenticatedFetch('/api/realtime-search', {
+            const response = await fetch('/api/realtime-search', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -75,168 +144,208 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({ 
                     nome_produto: searchTerm,
-                    cnpjs: Array.from(selectedMarkets) // Usar mercados selecionados se disponível
+                    cnpjs: Array.from(this.selectedMarkets)
                 })
             });
 
             if (!response.ok) {
-                throw new Error('Falha na busca');
+                throw new Error(`Erro ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
             
-            // Só processar resultados se o termo de busca ainda for o mesmo
-            if (searchTerm === currentSearchTerm) {
-                displaySearchResults(data.results || []);
+            // Só mostrar resultados se o termo ainda for o mesmo
+            if (searchTerm === this.currentSearchTerm) {
+                this.displayResults(data.results || []);
             }
 
         } catch (error) {
-            console.error('Erro na busca em tempo real:', error);
-            if (searchTerm === currentSearchTerm) {
-                showErrorState('Erro ao buscar produtos');
+            console.error('Erro na busca:', error);
+            if (searchTerm === this.currentSearchTerm) {
+                this.showMessage('Erro ao buscar produtos. Tente novamente.');
             }
         }
     }
 
-    function displaySearchResults(results) {
-        const searchResults = document.getElementById('searchResults');
-        
+    displayResults(results) {
         if (results.length === 0) {
-            searchResults.innerHTML = `
-                <div class="search-result-item no-results">
-                    <i class="fas fa-search"></i>
-                    <span>Nenhum produto encontrado para "${currentSearchTerm}"</span>
-                </div>
-            `;
-            searchResults.style.display = 'block';
+            this.showMessage(`Nenhum produto encontrado para "${this.currentSearchTerm}"`);
             return;
         }
 
-        // Agrupar resultados por produto (evitar duplicatas)
-        const productsMap = new Map();
+        // Agrupar por produto para evitar duplicatas
+        const uniqueProducts = this.groupProducts(results);
         
-        results.forEach(item => {
-            const productKey = item.codigo_barras || item.nome_produto;
-            if (!productsMap.has(productKey)) {
-                productsMap.set(productKey, {
-                    nome: item.nome_produto,
-                    marca: item.marca || '',
-                    codigo_barras: item.codigo_barras || '',
-                    categoria: item.categoria || '',
-                    preco_medio: 0,
-                    mercados: 0
-                });
-            }
-            
-            const product = productsMap.get(productKey);
-            product.mercados++;
-            if (item.preco_produto && item.preco_produto > 0) {
-                product.preco_medio = product.preco_medio === 0 ? 
-                    item.preco_produto : (product.preco_medio + item.preco_produto) / 2;
-            }
-        });
-
-        const uniqueProducts = Array.from(productsMap.values());
-        
-        searchResults.innerHTML = uniqueProducts.map(product => `
-            <div class="search-result-item" data-barcode="${product.codigo_barras}">
-                <div class="product-info">
-                    <div class="product-name">${product.nome}</div>
-                    ${product.marca ? `<div class="product-brand">${product.marca}</div>` : ''}
+        this.resultsContainer.innerHTML = uniqueProducts.map(product => `
+            <div class="search-result-item" data-product-name="${this.escapeHtml(product.nome)}">
+                <div class="product-main-info">
+                    <div class="product-name">${this.escapeHtml(product.nome)}</div>
+                    ${product.marca ? `<div class="product-brand">${this.escapeHtml(product.marca)}</div>` : ''}
                     ${product.codigo_barras ? `<div class="product-barcode">Código: ${product.codigo_barras}</div>` : ''}
                 </div>
                 <div class="product-stats">
-                    ${product.preco_medio > 0 ? `
-                        <div class="avg-price">R$ ${product.preco_medio.toFixed(2)}</div>
+                    ${product.preco_minimo > 0 ? `
+                        <div class="price-range">
+                            <span class="min-price">R$ ${product.preco_minimo.toFixed(2)}</span>
+                            ${product.preco_maximo > product.preco_minimo ? 
+                                ` - R$ ${product.preco_maximo.toFixed(2)}` : ''}
+                        </div>
                     ` : ''}
                     <div class="market-count">
                         <i class="fas fa-store"></i>
-                        ${product.mercados} mercado(s)
+                        ${product.mercados_count} mercado(s)
                     </div>
                 </div>
-                <button class="select-product-btn" onclick="selectProductForComparison('${product.codigo_barras || product.nome}', '${product.nome.replace(/'/g, "\\'")}')">
+                <button class="select-product-btn" onclick="productSearch.selectProduct('${this.escapeHtml(product.nome)}')">
                     <i class="fas fa-plus"></i>
+                    Selecionar
                 </button>
             </div>
         `).join('');
 
-        searchResults.style.display = 'block';
+        this.resultsContainer.style.display = 'block';
     }
 
-    function showLoadingState() {
-        const searchResults = document.getElementById('searchResults');
-        searchResults.innerHTML = `
+    groupProducts(results) {
+        const productsMap = new Map();
+        
+        results.forEach(item => {
+            const key = item.codigo_barras || item.nome_produto;
+            if (!productsMap.has(key)) {
+                productsMap.set(key, {
+                    nome: item.nome_produto,
+                    marca: item.marca || '',
+                    codigo_barras: item.codigo_barras || '',
+                    preco_minimo: Infinity,
+                    preco_maximo: 0,
+                    mercados_count: 0
+                });
+            }
+            
+            const product = productsMap.get(key);
+            product.mercados_count++;
+            
+            const price = item.preco_produto || 0;
+            if (price > 0) {
+                product.preco_minimo = Math.min(product.preco_minimo, price);
+                product.preco_maximo = Math.max(product.preco_maximo, price);
+            }
+        });
+
+        // Ajustar preço mínimo
+        Array.from(productsMap.values()).forEach(product => {
+            if (product.preco_minimo === Infinity) {
+                product.preco_minimo = 0;
+            }
+        });
+
+        return Array.from(productsMap.values());
+    }
+
+    selectProduct(productName) {
+        // Preencher o campo com o nome selecionado
+        this.productNameInput.value = productName;
+        this.hideResults();
+        
+        // Disparar evento de input para atualizar o estado do botão
+        this.productNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        this.showNotification(`"${productName}" selecionado para comparação`, 'success');
+    }
+
+    focusFirstResult() {
+        const firstResult = this.resultsContainer.querySelector('.search-result-item');
+        if (firstResult) {
+            firstResult.focus();
+        }
+    }
+
+    showLoading() {
+        this.resultsContainer.innerHTML = `
             <div class="search-result-item loading">
                 <div class="loader-small"></div>
-                <span>Buscando produtos...</span>
+                <span>Buscando "${this.currentSearchTerm}"...</span>
             </div>
         `;
-        searchResults.style.display = 'block';
+        this.resultsContainer.style.display = 'block';
     }
 
-    function showErrorState(message) {
-        const searchResults = document.getElementById('searchResults');
-        searchResults.innerHTML = `
-            <div class="search-result-item error">
-                <i class="fas fa-exclamation-circle"></i>
+    showMessage(message) {
+        this.resultsContainer.innerHTML = `
+            <div class="search-result-item message">
+                <i class="fas fa-info-circle"></i>
                 <span>${message}</span>
             </div>
         `;
-        searchResults.style.display = 'block';
+        this.resultsContainer.style.display = 'block';
     }
 
-    function hideResults() {
-        const searchResults = document.getElementById('searchResults');
-        searchResults.style.display = 'none';
+    hideResults() {
+        this.resultsContainer.style.display = 'none';
     }
 
-    // Função global para selecionar produto (chamada pelo HTML)
-    window.selectProductForComparison = function(barcodeOrName, productName) {
-        if (barcodeOrName && /^\d+$/.test(barcodeOrName)) {
-            // É um código de barras - adicionar ao campo de códigos
-            const barcodesInput = document.getElementById('barcodesInput');
-            const currentBarcodes = barcodesInput.value.trim();
-            const barcodesArray = currentBarcodes ? currentBarcodes.split(',').map(b => b.trim()) : [];
-            
-            if (!barcodesArray.includes(barcodeOrName)) {
-                if (barcodesArray.length >= 10) {
-                    showNotification('Máximo de 10 códigos de barras atingido', 'warning');
-                    return;
-                }
-                
-                barcodesArray.push(barcodeOrName);
-                barcodesInput.value = barcodesArray.join(', ');
-                
-                showNotification(`Produto "${productName}" adicionado para comparação`, 'success');
-            }
-        } else {
-            // É um nome de produto - preencher o campo de nome
-            productNameInput.value = productName;
-            showNotification(`Produto "${productName}" selecionado para comparação`, 'success');
+    async getSession() {
+        // Usa a função do auth.js se disponível
+        if (typeof getSession === 'function') {
+            return await getSession();
         }
         
-        hideResults();
-        validateInputs(); // Atualizar estado do botão de comparação
-    };
+        // Fallback: tenta obter da sessionStorage
+        try {
+            const sessionData = sessionStorage.getItem('supabase.auth.token');
+            return sessionData ? JSON.parse(sessionData) : null;
+        } catch {
+            return null;
+        }
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        
+        const icons = {
+            success: 'fa-check-circle',
+            error: 'fa-exclamation-circle',
+            warning: 'fa-exclamation-triangle',
+            info: 'fa-info-circle'
+        };
+        
+        notification.innerHTML = `
+            <i class="fas ${icons[type] || icons.info}"></i>
+            <span>${message}</span>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Animação de entrada
+        setTimeout(() => notification.classList.add('show'), 10);
+        
+        // Remover após 3 segundos
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 3000);
+    }
+}
+
+// Inicializar quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', () => {
+    window.productSearch = new ProductNameSearch();
 });
 
-// Função utilitária para mostrar notificações
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    const icon = type === 'success' ? 'fa-check-circle' : 
-                type === 'error' ? 'fa-exclamation-circle' : 
-                type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
-    notification.innerHTML = `<i class="fas ${icon}"></i> ${message}`;
-    document.body.appendChild(notification);
-    
-    setTimeout(() => notification.classList.add('show'), 10);
-    setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => {
-            if (document.body.contains(notification)) {
-                document.body.removeChild(notification);
-            }
-        }, 300);
-    }, type === 'success' ? 3000 : 5000);
-}
+// Também inicializar quando a página terminar de carregar
+window.addEventListener('load', () => {
+    if (!window.productSearch) {
+        window.productSearch = new ProductNameSearch();
+    }
+});
