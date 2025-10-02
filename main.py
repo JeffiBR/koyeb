@@ -86,36 +86,40 @@ class LogDeleteRequest(BaseModel):
 # --- 4. AUTENTICAÇÃO, AUTORIZAÇÃO E MIDDLEWARES ---
 # --------------------------------------------------------------------------
 
-async def get_current_user(token: str = Header(None, alias="Authorization")) -> UserProfile:
+async def get_current_user(authorization: str = Header(None)) -> UserProfile:
     """Extrai informações do usuário a partir do token JWT e busca seu perfil."""
-    if not token or not token.startswith("Bearer "):
+    if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Token de autenticação ausente ou inválido.")
 
     try:
-        jwt_token = token.split(" ")[1]
+        jwt_token = authorization.split(" ")[1]
         
-        # 1. Autenticar o token
-        user_response = supabase_admin.auth.get_user(jwt_token)
+        # 1. Autenticar o token usando o cliente normal (não admin)
+        user_response = supabase.auth.get_user(jwt_token)
         user_data = user_response.user
         
         if not user_data:
              raise HTTPException(status_code=401, detail="Token inválido ou expirado.")
 
-        # 2. Buscar perfil (nome completo e permissões)
-        profile_response = supabase_admin.table('profiles').select('full_name, access_pages').eq('id', user_data.id).single().execute()
+        # 2. Buscar perfil (nome completo e permissões) usando cliente admin para bypass RLS se necessário
+        profile_response = supabase_admin.table('profiles').select('full_name, role, allowed_pages').eq('id', user_data.id).single().execute()
         
         profile_data = profile_response.data
         if not profile_data:
             raise HTTPException(status_code=403, detail="Perfil de usuário não encontrado.")
 
-        is_admin = 'admin' in profile_data.get('access_pages', [])
+        # Determinar se é admin baseado na role
+        is_admin = profile_data.get('role') == 'admin'
+        
+        # Usar allowed_pages do perfil existente
+        access_pages = profile_data.get('allowed_pages', [])
         
         return UserProfile(
             id=user_data.id,
             email=user_data.email,
             is_admin=is_admin,
             full_name=profile_data.get('full_name'),
-            access_pages=profile_data.get('access_pages', [])
+            access_pages=access_pages
         )
     except APIError as e:
         logging.error(f"Erro Supabase na autenticação: {e.message}")
@@ -125,13 +129,13 @@ async def get_current_user(token: str = Header(None, alias="Authorization")) -> 
         raise HTTPException(status_code=500, detail="Erro interno de servidor.")
 
 # --- Dependência opcional para obter o usuário atual (se estiver logado) ---
-async def get_current_user_optional(token: str = Header(None, alias="Authorization")) -> Optional[UserProfile]:
+async def get_current_user_optional(authorization: str = Header(None)) -> Optional[UserProfile]:
     """Tenta obter o usuário atual, mas retorna None se não houver token ou se for inválido."""
-    if not token or not token.startswith("Bearer "):
+    if not authorization or not authorization.startswith("Bearer "):
         return None
 
     try:
-        return await get_current_user(token)
+        return await get_current_user(authorization)
     except HTTPException:
         return None
 
@@ -179,14 +183,10 @@ def log_page_access(page_key: str, user: UserProfile):
 
 def log_search(term: str, type: str, cnpjs: Optional[List[str]], count: int, user: UserProfile):
     """Função para registrar logs de busca, rodando em background."""
-    user_name = user.full_name
-    user_email = user.email
-    user_id = user.id
-
     log_data = {
-        "user_id": user_id,
-        "user_name": user_name,
-        "user_email": user_email,
+        "user_id": user.id,
+        "user_name": user.full_name,
+        "user_email": user.email,
         "action_type": "search" if type == 'database' else "realtime_search",
         "search_term": term,
         "selected_markets": cnpjs if cnpjs else [],
@@ -195,7 +195,7 @@ def log_search(term: str, type: str, cnpjs: Optional[List[str]], count: int, use
     try: 
         supabase_admin.table('log_de_usuarios').insert(log_data).execute()
     except Exception as e: 
-        logging.error(f"Erro ao salvar log de busca para {user_email}: {e}")
+        logging.error(f"Erro ao salvar log de busca para {user.email}: {e}")
 
 # --------------------------------------------------------------------------
 # --- 6. ENDPOINTS DA APLICAÇÃO ---
@@ -213,8 +213,11 @@ async def create_user(user_data: UserCreate, admin_user: UserProfile = Depends(r
         user_id = created_user_res.user.id
         logging.info(f"Usuário criado no Auth com ID: {user_id}")
         
+        # Atualizar perfil com role e allowed_pages (mantendo compatibilidade)
         profile_update_response = supabase_admin.table('profiles').update({
-            'role': user_data.role, 'allowed_pages': user_data.allowed_pages
+            'role': user_data.role, 
+            'allowed_pages': user_data.allowed_pages,
+            'access_pages': user_data.allowed_pages  # Manter ambos os campos para compatibilidade
         }).eq('id', user_id).execute()
         
         if not profile_update_response.data:
@@ -232,7 +235,13 @@ async def create_user(user_data: UserCreate, admin_user: UserProfile = Depends(r
 
 @app.put("/api/users/{user_id}")
 async def update_user(user_id: str, user_data: UserUpdate, admin_user: UserProfile = Depends(require_page_access('users'))):
-    supabase_admin.table('profiles').update(user_data.dict()).eq('id', user_id).execute()
+    update_data = {
+        'full_name': user_data.full_name,
+        'role': user_data.role,
+        'allowed_pages': user_data.allowed_pages,
+        'access_pages': user_data.allowed_pages  # Manter compatibilidade
+    }
+    supabase_admin.table('profiles').update(update_data).eq('id', user_id).execute()
     return {"message": "Usuário atualizado com sucesso"}
         
 @app.get("/api/users")
@@ -373,9 +382,9 @@ async def get_user_logs(
     user: UserProfile = Depends(require_page_access('user_logs'))
 ):
     start_index = (page - 1) * page_size
-    end_index = start_index + page_size
+    end_index = start_index + page_size - 1
 
-    query = supabase_admin.table('log_de_usuarios').select('*, count()', count='exact')
+    query = supabase_admin.table('log_de_usuarios').select('*', count='exact')
 
     if user_id:
         query = query.eq('user_id', user_id)
@@ -388,8 +397,6 @@ async def get_user_logs(
 
     try:
         response = query.order('created_at', desc=True).range(start_index, end_index).execute()
-        
-        total_logs = response.count if response.count is not None else 0
         
         user_logs = []
         for log in response.data:
@@ -408,7 +415,7 @@ async def get_user_logs(
 
         return {
             "data": user_logs,
-            "total_count": total_logs,
+            "total_count": response.count,
             "page": page,
             "page_size": page_size
         }
