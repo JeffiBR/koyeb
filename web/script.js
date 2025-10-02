@@ -133,7 +133,13 @@ document.addEventListener('DOMContentLoaded', () => {
         marketsToRender.forEach(market => {
             const card = document.createElement('div');
             card.className = 'market-card';
-            card.innerHTML = `<input type="checkbox" name="supermarket" value="${market.cnpj}" style="display: none;"><div class="market-info"><div class="market-name">${market.nome}</div><div class="market-cnpj">${market.cnpj}</div></div>`;
+            card.innerHTML = `
+                <input type="checkbox" name="supermarket" value="${market.cnpj}" style="display: none;">
+                <div class="market-info">
+                    <div class="market-name">${market.nome}</div>
+                    <div class="market-address">${market.endereco || 'Endereço não disponível'}</div>
+                </div>
+            `;
             card.addEventListener('click', (e) => {
                 const checkbox = card.querySelector('input');
                 checkbox.checked = !checkbox.checked;
