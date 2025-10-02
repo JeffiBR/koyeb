@@ -33,8 +33,7 @@ ECONOMIZA_ALAGOAS_TOKEN = os.getenv("ECONOMIZA_ALAGOAS_TOKEN")
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://127.0.0.1:5500,http://localhost:8000").split(',')
 
 if not all([SUPABASE_URL, SUPABASE_KEY, SERVICE_ROLE_KEY, ECONOMIZA_ALAGOAS_TOKEN]):
-    logging.error("Variáveis de ambiente essenciais (SUPABASE_URL, SUPABASE_KEY, SERVICE_ROLE_KEY, ECONOMIZA_ALAGOAS_TOKEN) não estão definidas. Verifique seu arquivo .env")
-    exit(1)
+    raise ValueError("Variáveis de ambiente essenciais não configuradas!")
 
 # --- Clientes Supabase ---
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -52,100 +51,48 @@ async def handle_supabase_errors(request: Request, exc: APIError):
     )
 
 # --------------------------------------------------------------------------
-# --- 3. MODELOS DE DADOS (Pydantic) ---
+# --- 3. AUTENTICAÇÃO, AUTORIZAÇÃO E MIDDLEWARES ---
 # --------------------------------------------------------------------------
-
 class UserProfile(BaseModel):
-    id: str
-    email: str
-    is_admin: bool
-    full_name: Optional[str] = None
-    access_pages: List[str] = Field(default_factory=list)
-
-class Categoria(BaseModel):
-    id: Optional[int] = None; nome: str; palavras_chave: List[str]; regra_unidade: Optional[str] = None
-class UserCreate(BaseModel):
-    email: str; password: str; full_name: str; role: str; allowed_pages: List[str] = []
-class UserUpdate(BaseModel):
-    full_name: str; role: str; allowed_pages: List[str]
-class ProfileUpdate(BaseModel):
-    full_name: str; job_title: str; avatar_url: Optional[str] = None
-class Supermercado(BaseModel):
-    id: Optional[int] = None; nome: str; cnpj: str; endereco: Optional[str] = None
-class RealtimeSearchRequest(BaseModel):
-    produto: str; cnpjs: Optional[List[str]] = Field(default_factory=list)
-class PriceHistoryRequest(BaseModel):
-    product_identifier: str; cnpjs: List[str]; end_date: date = Field(default_factory=date.today); start_date: date = Field(default_factory=lambda: date.today() - timedelta(days=29))
-class PruneByCollectionsRequest(BaseModel):
-    cnpj: str; collection_ids: List[int]
-class LogDeleteRequest(BaseModel):
-    date: Optional[date] = None
-    user_id: Optional[str] = None
-
-# --------------------------------------------------------------------------
-# --- 4. AUTENTICAÇÃO, AUTORIZAÇÃO E MIDDLEWARES ---
-# --------------------------------------------------------------------------
+    id: str; role: str; allowed_pages: List[str] = []
 
 async def get_current_user(authorization: str = Header(None)) -> UserProfile:
-    """Extrai informações do usuário a partir do token JWT e busca seu perfil."""
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Token de autenticação ausente ou inválido.")
-
+        raise HTTPException(status_code=401, detail="Token de autorização ausente ou mal formatado")
+    jwt = authorization.split(" ")[1]
     try:
-        jwt_token = authorization.split(" ")[1]
-        
-        # 1. Autenticar o token usando o cliente normal (não admin)
-        user_response = supabase.auth.get_user(jwt_token)
-        user_data = user_response.user
-        
-        if not user_data:
-             raise HTTPException(status_code=401, detail="Token inválido ou expirado.")
-
-        # 2. Buscar perfil (nome completo e permissões) usando cliente admin para bypass RLS se necessário
-        profile_response = supabase_admin.table('profiles').select('full_name, role, allowed_pages').eq('id', user_data.id).single().execute()
-        
-        profile_data = profile_response.data
-        if not profile_data:
-            raise HTTPException(status_code=403, detail="Perfil de usuário não encontrado.")
-
-        # Determinar se é admin baseado na role
-        is_admin = profile_data.get('role') == 'admin'
-        
-        # Usar allowed_pages do perfil existente
-        access_pages = profile_data.get('allowed_pages', [])
-        
-        return UserProfile(
-            id=user_data.id,
-            email=user_data.email,
-            is_admin=is_admin,
-            full_name=profile_data.get('full_name'),
-            access_pages=access_pages
-        )
-    except APIError as e:
-        logging.error(f"Erro Supabase na autenticação: {e.message}")
-        raise HTTPException(status_code=401, detail="Falha na autenticação do token.")
+        user_response = supabase.auth.get_user(jwt)
+        user_id = user_response.user.id
+        profile_response = supabase.table('profiles').select('role, allowed_pages').eq('id', user_id).single().execute()
+        if not profile_response.data:
+            raise HTTPException(status_code=404, detail="Perfil do usuário não encontrado.")
+        return UserProfile(id=user_id, role=profile_response.data.get('role', 'user'), allowed_pages=profile_response.data.get('allowed_pages', []))
     except Exception as e:
-        logging.error(f"Erro inesperado na autenticação: {e}")
-        raise HTTPException(status_code=500, detail="Erro interno de servidor.")
+        if isinstance(e, APIError): raise e
+        logging.error(f"Erro de validação de token: {e}")
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado")
 
 # --- Dependência opcional para obter o usuário atual (se estiver logado) ---
 async def get_current_user_optional(authorization: str = Header(None)) -> Optional[UserProfile]:
-    """Tenta obter o usuário atual, mas retorna None se não houver token ou se for inválido."""
     if not authorization or not authorization.startswith("Bearer "):
         return None
-
+    jwt = authorization.split(" ")[1]
     try:
-        return await get_current_user(authorization)
-    except HTTPException:
+        user_response = supabase.auth.get_user(jwt)
+        user_id = user_response.user.id
+        profile_response = supabase.table('profiles').select('role, allowed_pages').eq('id', user_id).single().execute()
+        if not profile_response.data:
+            return None
+        return UserProfile(id=user_id, role=profile_response.data.get('role', 'user'), allowed_pages=profile_response.data.get('allowed_pages', []))
+    except Exception as e:
         return None
 
 def require_page_access(page_key: str):
-    """Dependência para verificar se o usuário tem permissão para a página."""
-    def page_access_checker(current_user: UserProfile = Depends(get_current_user)):
-        if page_key not in current_user.access_pages and not current_user.is_admin:
-            raise HTTPException(status_code=403, detail=f"Acesso negado. Necessária permissão para '{page_key}'.")
+    async def _verify_access(current_user: UserProfile = Depends(get_current_user)):
+        if current_user.role != 'admin' and page_key not in current_user.allowed_pages:
+            raise HTTPException(status_code=403, detail=f"Acesso negado à funcionalidade: {page_key}")
         return current_user
-    return page_access_checker
+    return _verify_access
 
 initial_status = {
     "status": "IDLE", "startTime": None, "progressPercent": 0, "etaSeconds": 0,
@@ -154,7 +101,6 @@ initial_status = {
     "totalItemsFound": 0, "progresso": "Aguardando início", "report": None
 }
 collection_status: Dict[str, Any] = initial_status.copy()
-
 app.add_middleware(
     CORSMiddleware, 
     allow_origins=ALLOWED_ORIGINS,
@@ -164,38 +110,65 @@ app.add_middleware(
 )
 
 # --------------------------------------------------------------------------
-# --- 5. FUNÇÕES DE LOG (LOGIC REFACTOR) ---
+# --- 4. MODELOS DE DADOS (PYDANTIC) ---
+# --------------------------------------------------------------------------
+class Categoria(BaseModel):
+    id: Optional[int] = None; nome: str; palavras_chave: List[str]; regra_unidade: Optional[str] = None
+class UserCreate(BaseModel):
+    email: str; password: str; full_name: str; role: str; allowed_pages: List[str] = []
+class UserUpdate(BaseModel):
+    full_name: str; role: str; allowed_pages: List[str]
+class ProfileUpdate(BaseModel):
+    full_name: str; job_title: str; avatar_url: Optional[str] = None
+class Supermercado(BaseModel):
+    id: Optional[int] = None; nome: str; cnpj: str; endereco: Optional[str] = None  # Campo endereco adicionado
+class RealtimeSearchRequest(BaseModel):
+    produto: str; cnpjs: List[str]
+class PriceHistoryRequest(BaseModel):
+    product_identifier: str; cnpjs: List[str]; end_date: date = Field(default_factory=date.today); start_date: date = Field(default_factory=lambda: date.today() - timedelta(days=29))
+class PruneByCollectionsRequest(BaseModel):
+    cnpj: str; collection_ids: List[int]
+
+# --------------------------------------------------------------------------
+# --- 5. FUNÇÕES DE LOG CORRIGIDAS ---
 # --------------------------------------------------------------------------
 
-def log_page_access(page_key: str, user: UserProfile):
-    """Função para registrar o acesso à página, rodando em background."""
-    try:
-        log_data = {
-            "user_id": user.id,
-            "user_name": user.full_name,
-            "user_email": user.email,
-            "action_type": "access",
-            "page_accessed": page_key,
-        }
-        supabase_admin.table('log_de_usuarios').insert(log_data).execute()
-    except Exception as e:
-        logging.error(f"Erro ao salvar log de acesso à página {page_key} para {user.email}: {e}")
-
-def log_search(term: str, type: str, cnpjs: Optional[List[str]], count: int, user: UserProfile):
+def log_search(term: str, type: str, cnpjs: Optional[List[str]], count: int, user: Optional[UserProfile] = None):
     """Função para registrar logs de busca, rodando em background."""
-    log_data = {
-        "user_id": user.id,
-        "user_name": user.full_name,
-        "user_email": user.email,
-        "action_type": "search" if type == 'database' else "realtime_search",
-        "search_term": term,
-        "selected_markets": cnpjs if cnpjs else [],
-        "result_count": count
-    }
-    try: 
+    try:
+        # Buscar informações completas do usuário se disponível
+        user_id = user.id if user else None
+        user_name = None
+        user_email = None
+        
+        if user_id:
+            try:
+                # Buscar informações completas do perfil
+                profile_response = supabase.table('profiles').select('full_name').eq('id', user_id).single().execute()
+                if profile_response.data:
+                    user_name = profile_response.data.get('full_name')
+                
+                # Buscar email do usuário
+                user_response = supabase.auth.admin.get_user_by_id(user_id)
+                if user_response.user:
+                    user_email = user_response.user.email
+            except Exception as e:
+                logging.error(f"Erro ao buscar informações do usuário {user_id}: {e}")
+        
+        log_data = {
+            "user_id": user_id,
+            "user_name": user_name,
+            "user_email": user_email,
+            "action_type": "search" if type == 'database' else "realtime_search",
+            "search_term": term,
+            "selected_markets": cnpjs if cnpjs else [],
+            "result_count": count
+        }
+        
+        # Usar supabase_admin para garantir permissões
         supabase_admin.table('log_de_usuarios').insert(log_data).execute()
     except Exception as e: 
-        logging.error(f"Erro ao salvar log de busca para {user.email}: {e}")
+        logging.error(f"Erro ao salvar log de busca: {e}")
 
 # --------------------------------------------------------------------------
 # --- 6. ENDPOINTS DA APLICAÇÃO ---
@@ -213,11 +186,8 @@ async def create_user(user_data: UserCreate, admin_user: UserProfile = Depends(r
         user_id = created_user_res.user.id
         logging.info(f"Usuário criado no Auth com ID: {user_id}")
         
-        # Atualizar perfil com role e allowed_pages (mantendo compatibilidade)
         profile_update_response = supabase_admin.table('profiles').update({
-            'role': user_data.role, 
-            'allowed_pages': user_data.allowed_pages,
-            'access_pages': user_data.allowed_pages  # Manter ambos os campos para compatibilidade
+            'role': user_data.role, 'allowed_pages': user_data.allowed_pages
         }).eq('id', user_id).execute()
         
         if not profile_update_response.data:
@@ -235,13 +205,7 @@ async def create_user(user_data: UserCreate, admin_user: UserProfile = Depends(r
 
 @app.put("/api/users/{user_id}")
 async def update_user(user_id: str, user_data: UserUpdate, admin_user: UserProfile = Depends(require_page_access('users'))):
-    update_data = {
-        'full_name': user_data.full_name,
-        'role': user_data.role,
-        'allowed_pages': user_data.allowed_pages,
-        'access_pages': user_data.allowed_pages  # Manter compatibilidade
-    }
-    supabase_admin.table('profiles').update(update_data).eq('id', user_id).execute()
+    supabase_admin.table('profiles').update(user_data.dict()).eq('id', user_id).execute()
     return {"message": "Usuário atualizado com sucesso"}
         
 @app.get("/api/users")
@@ -314,6 +278,7 @@ async def list_supermarkets_admin(user: UserProfile = Depends(get_current_user))
 
 @app.post("/api/supermarkets", status_code=201, response_model=Supermercado)
 async def create_supermarket(market: Supermercado, user: UserProfile = Depends(require_page_access('markets'))):
+    # Remove campos None para evitar problemas com o banco
     market_data = market.dict(exclude={'id'})
     market_data = {k: v for k, v in market_data.items() if v is not None}
     
@@ -322,6 +287,7 @@ async def create_supermarket(market: Supermercado, user: UserProfile = Depends(r
 
 @app.put("/api/supermarkets/{id}", response_model=Supermercado)
 async def update_supermarket(id: int, market: Supermercado, user: UserProfile = Depends(require_page_access('markets'))):
+    # Remove campos None e o id
     market_data = market.dict(exclude={'id'})
     market_data = {k: v for k, v in market_data.items() if v is not None}
     
@@ -371,135 +337,128 @@ async def get_collections_by_market(cnpj: str, user: UserProfile = Depends(requi
     response = supabase.rpc('get_collections_for_market', {'market_cnpj': cnpj}).execute()
     return response.data
 
-# --- LOGS DE USUÁRIOS (ATUALIZADO) ---
+# --- LOGS DE USUÁRIOS CORRIGIDOS ---
 @app.get("/api/user-logs")
 async def get_user_logs(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     user_id: Optional[str] = Query(None),
-    date_filter: Optional[date] = Query(None),
+    date: Optional[str] = Query(None),
     action_type: Optional[str] = Query(None),
     user: UserProfile = Depends(require_page_access('user_logs'))
 ):
     start_index = (page - 1) * page_size
     end_index = start_index + page_size - 1
-
-    query = supabase_admin.table('log_de_usuarios').select('*', count='exact')
-
+    
+    # Construir query base - USANDO A TABELA log_de_usuarios
+    query = supabase.table('log_de_usuarios').select('*', count='exact')
+    
+    # Aplicar filtros
     if user_id:
         query = query.eq('user_id', user_id)
+    if date:
+        query = query.gte('created_at', f'{date}T00:00:00').lte('created_at', f'{date}T23:59:59')
     if action_type:
         query = query.eq('action_type', action_type)
-    if date_filter:
-        start_of_day = datetime.combine(date_filter, datetime.min.time()).isoformat()
-        end_of_day = datetime.combine(date_filter, datetime.max.time()).isoformat()
-        query = query.gte('created_at', start_of_day).lte('created_at', end_of_day)
+    
+    # Ordenar e paginar
+    response = query.order('created_at', desc=True).range(start_index, end_index).execute()
+    
+    # Processar logs - agora os dados do usuário já estão no próprio log
+    user_logs = []
+    for log in response.data:
+        user_logs.append({
+            'log_id': log['id'],
+            'user_id': log.get('user_id'),
+            'user_name': log.get('user_name') or 'N/A',
+            'user_email': log.get('user_email') or 'N/A',
+            'action_type': log.get('action_type'),
+            'search_term': log.get('search_term'),
+            'selected_markets': log.get('selected_markets'),
+            'result_count': log.get('result_count'),
+            'page_accessed': log.get('page_accessed'),
+            'created_at': log.get('created_at')
+        })
+    
+    return {
+        "data": user_logs,
+        "total_count": response.count,
+        "page": page,
+        "page_size": page_size
+    }
 
-    try:
-        response = query.order('created_at', desc=True).range(start_index, end_index).execute()
-        
-        user_logs = []
-        for log in response.data:
-            user_logs.append({
-                'log_id': log['id'],
-                'user_id': log.get('user_id'),
-                'user_name': log.get('user_name') or 'Usuário Desconhecido',
-                'user_email': log.get('user_email') or 'N/A',
-                'action_type': log.get('action_type'),
-                'search_term': log.get('search_term'),
-                'selected_markets': log.get('selected_markets'),
-                'result_count': log.get('result_count'),
-                'page_accessed': log.get('page_accessed'),
-                'created_at': log.get('created_at')
-            })
+@app.delete("/api/user-logs/{log_id}")
+async def delete_single_log(log_id: int, user: UserProfile = Depends(require_page_access('user_logs'))):
+    response = supabase.table('log_de_usuarios').delete().eq('id', log_id).execute()
+    return {"message": "Log excluído com sucesso", "deleted_count": len(response.data)}
 
-        return {
-            "data": user_logs,
-            "total_count": response.count,
-            "page": page,
-            "page_size": page_size
-        }
-    except APIError as e:
-        logging.error(f"Erro Supabase ao buscar logs: {e.message}")
-        raise HTTPException(status_code=500, detail="Erro ao buscar logs no banco de dados.")
-    except Exception as e:
-        logging.error(f"Erro inesperado ao buscar logs: {e}")
-        raise HTTPException(status_code=500, detail="Erro interno de servidor ao carregar logs.")
+@app.delete("/api/user-logs")
+async def delete_user_logs(
+    user_id: Optional[str] = Query(None),
+    date: Optional[str] = Query(None),
+    user: UserProfile = Depends(require_page_access('user_logs'))
+):
+    query = supabase.table('log_de_usuarios').delete()
+    
+    if user_id:
+        query = query.eq('user_id', user_id)
+    if date:
+        query = query.gte('created_at', f'{date}T00:00:00').lte('created_at', f'{date}T23:59:59')
+    
+    response = query.execute()
+    return {"message": "Logs excluídos com sucesso", "deleted_count": len(response.data)}
 
 @app.get("/api/user-logs/export")
 async def export_user_logs(
     user_id: Optional[str] = Query(None),
+    date: Optional[str] = Query(None),
     action_type: Optional[str] = Query(None),
-    date_filter: Optional[date] = Query(None),
     user: UserProfile = Depends(require_page_access('user_logs'))
 ):
-    query = supabase_admin.table('log_de_usuarios').select('*')
-
+    import csv
+    import io
+    
+    # Buscar todos os logs (sem paginação para exportação)
+    query = supabase.table('log_de_usuarios').select('*')
+    
     if user_id:
         query = query.eq('user_id', user_id)
+    if date:
+        query = query.gte('created_at', f'{date}T00:00:00').lte('created_at', f'{date}T23:59:59')
     if action_type:
         query = query.eq('action_type', action_type)
-    if date_filter:
-        start_of_day = datetime.combine(date_filter, datetime.min.time()).isoformat()
-        end_of_day = datetime.combine(date_filter, datetime.max.time()).isoformat()
-        query = query.gte('created_at', start_of_day).lte('created_at', end_of_day)
-
-    try:
-        response = query.order('created_at', desc=True).execute()
-        
-        if not response.data:
-            raise HTTPException(status_code=404, detail="Nenhum log encontrado para exportação.")
-
-        logs_data = []
-        for log in response.data:
-            logs_data.append({
-                'ID do Log': log['id'],
-                'Data/Hora': log.get('created_at'),
-                'ID do Usuário': log.get('user_id'),
-                'Nome do Usuário': log.get('user_name') or 'Desconhecido',
-                'E-mail do Usuário': log.get('user_email') or 'N/A',
-                'Tipo de Ação': log.get('action_type'),
-                'Página Acessada': log.get('page_accessed') or '',
-                'Termo Pesquisado': log.get('search_term') or '',
-                'Mercados Selecionados': ', '.join(log.get('selected_markets', [])),
-                'Contagem de Resultados': log.get('result_count')
-            })
-
-        df = pd.DataFrame(logs_data)
-        csv_output = df.to_csv(index=False, sep=';', encoding='utf-8-sig')
-        
-        return Response(
-            content=csv_output,
-            media_type="text/csv",
-            headers={
-                "Content-Disposition": f"attachment; filename=logs-usuarios-{date.today()}.csv"
-            }
-        )
-
-    except APIError as e:
-        logging.error(f"Erro Supabase ao exportar logs: {e.message}")
-        raise HTTPException(status_code=500, detail="Erro ao exportar logs do banco de dados.")
-
-@app.delete("/api/user-logs/{log_id}")
-async def delete_single_log(log_id: int, user: UserProfile = Depends(require_page_access('user_logs'))):
-    response = supabase_admin.table('log_de_usuarios').delete().eq('id', log_id).execute()
-    return {"message": "Log excluído com sucesso", "deleted_count": len(response.data)}
-
-@app.post("/api/user-logs/delete-by-date")
-async def delete_logs_by_date(
-    request: LogDeleteRequest,
-    user: UserProfile = Depends(require_page_access('user_logs'))
-):
-    if not request.date:
-        raise HTTPException(status_code=400, detail="Data é obrigatória para esta operação.")
-        
-    try:
-        response = supabase_admin.table('log_de_usuarios').delete().lte('created_at', request.date.isoformat()).execute()
-        return {"message": f"Logs até a data {request.date.isoformat()} deletados com sucesso."}
-
-    except Exception as e:
-        logging.error(f"Erro ao deletar logs por data: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao deletar logs.")
+    
+    response = query.order('created_at', desc=True).execute()
+    
+    # Criar CSV em memória
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Escrever cabeçalho
+    writer.writerow(['ID', 'Usuário', 'Email', 'Ação', 'Termo Pesquisado', 'Mercados', 'Resultados', 'Página Acessada', 'Data/Hora'])
+    
+    # Escrever dados
+    for log in response.data:
+        writer.writerow([
+            log['id'],
+            log.get('user_name', ''),
+            log.get('user_email', ''),
+            log.get('action_type', ''),
+            log.get('search_term', ''),
+            ', '.join(log.get('selected_markets', [])),
+            log.get('result_count', ''),
+            log.get('page_accessed', ''),
+            log.get('created_at', '')
+        ])
+    
+    content = output.getvalue()
+    output.close()
+    
+    return Response(
+        content=content,
+        media_type='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=user_logs.csv'}
+    )
 
 # --- Endpoints Públicos e de Usuário Logado ---
 @app.get("/api/products-log")
@@ -522,8 +481,7 @@ async def search_products(
     response = query.limit(500).execute()
     
     # Log da busca com user_id se disponível
-    if current_user:
-        background_tasks.add_task(log_search, q, 'database', cnpjs, len(response.data), current_user)
+    background_tasks.add_task(log_search, q, 'database', cnpjs, len(response.data), current_user)
     
     if not response.data: return {"results": []}
     df = pd.DataFrame(response.data)
@@ -558,8 +516,7 @@ async def realtime_search(
             resultados_finais.extend(resultado)
     
     # Log da busca em tempo real com user_id se disponível
-    if current_user:
-        background_tasks.add_task(log_search, request.produto, 'realtime', request.cnpjs, len(resultados_finais), current_user)
+    background_tasks.add_task(log_search, request.produto, 'realtime', request.cnpjs, len(resultados_finais), current_user)
     
     return {"results": sorted(resultados_finais, key=lambda x: x.get('preco_produto', float('inf')))}
 
@@ -626,11 +583,3 @@ async def get_dashboard_bargains(start_date: date, end_date: date, cnpjs: Option
     
 # --- Servir o Frontend ---
 app.mount("/", StaticFiles(directory="web", html=True), name="static")
-
-# --------------------------------------------------------------------------
-# --- 7. ENDPOINT RAIZ (Sanity Check) ---
-# --------------------------------------------------------------------------
-
-@app.get("/")
-def read_root():
-    return {"message": "Bem-vindo à API de Preços AL - Versão 3.1.2"}
