@@ -62,30 +62,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const marketCard = document.createElement('div');
             marketCard.className = `market-card ${selectedMarkets.has(market.cnpj) ? 'selected' : ''}`;
             marketCard.innerHTML = `
-                <input type="checkbox" name="supermarket" value="${market.cnpj}" style="display: none;">
                 <div class="market-info">
                     <div class="market-name">${market.nome}</div>
-                    <div class="market-address">${market.endereco || 'Endereço não disponível'}</div>
+                    <div class="market-cnpj">${market.cnpj}</div>
                 </div>
             `;
             
-            marketCard.addEventListener('click', () => toggleMarketSelection(market.cnpj, marketCard));
+            marketCard.addEventListener('click', () => toggleMarketSelection(market.cnpj));
             supermarketGrid.appendChild(marketCard);
         });
     }
 
-    function toggleMarketSelection(cnpj, marketCard) {
-        const checkbox = marketCard.querySelector('input');
+    function toggleMarketSelection(cnpj) {
         if (selectedMarkets.has(cnpj)) {
             selectedMarkets.delete(cnpj);
-            checkbox.checked = false;
-            marketCard.classList.remove('selected');
         } else {
             selectedMarkets.add(cnpj);
-            checkbox.checked = true;
-            marketCard.classList.add('selected');
         }
         updateSelectionCount();
+        renderMarketGrid(filteredMarkets);
     }
 
     function updateSelectionCount() {
@@ -99,15 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const hasMarkets = selectedMarkets.size >= 2;
         
         compareButton.disabled = !((hasBarcodes || hasProductName) && hasMarkets);
-        
-        // Atualizar visual do botão
-        if (compareButton.disabled) {
-            compareButton.style.opacity = '0.6';
-            compareButton.style.cursor = 'not-allowed';
-        } else {
-            compareButton.style.opacity = '1';
-            compareButton.style.cursor = 'pointer';
-        }
     }
 
     function setupEventListeners() {
@@ -157,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             filteredMarkets = allMarkets.filter(market => 
                 market.nome.toLowerCase().includes(searchTerm) ||
-                (market.endereco && market.endereco.toLowerCase().includes(searchTerm))
+                market.cnpj.includes(searchTerm)
             );
         }
         
@@ -170,9 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function selectAllFilteredMarkets() {
-        filteredMarkets.forEach(market => {
-            selectedMarkets.add(market.cnpj);
-        });
+        filteredMarkets.forEach(market => selectedMarkets.add(market.cnpj));
         updateSelectionCount();
         renderMarketGrid(filteredMarkets);
     }
