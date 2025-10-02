@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- ELEMENTOS DA UI ---
+    // --- ELEMENTOS DA UI (Mapeados para o seu novo HTML) ---
     const searchInput = document.getElementById('searchInput');
     const searchButton = document.getElementById('searchButton');
     const realtimeSearchButton = document.getElementById('realtimeSearchButton');
@@ -56,115 +56,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const buildProductCard = (item, allItemsInResult) => {
-        const price = typeof item.preco_produto === 'number' ? 
-            `R$ ${item.preco_produto.toFixed(2).replace('.', ',')}` : 'N/A';
-        
-        const date = item.data_ultima_venda ? 
-            new Date(item.data_ultima_venda).toLocaleDateString('pt-BR') : 'N/A';
-        
+        const price = typeof item.preco_produto === 'number' ? `R$ ${item.preco_produto.toFixed(2).replace('.', ',')}` : 'N/A';
+        const date = item.data_ultima_venda ? new Date(item.data_ultima_venda).toLocaleDateString('pt-BR') : 'N/A';
         const prices = allItemsInResult.map(r => r.preco_produto).filter(p => typeof p === 'number');
         const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-        
         let priceClass = '';
-        let priceBadge = '';
         if (prices.length > 1 && item.preco_produto === minPrice) {
             priceClass = 'cheapest-price';
-            priceBadge = '<div class="price-badge"><i class="fas fa-tag"></i> Melhor Preço</div>';
         }
-
-        // Buscar informações completas do mercado
-        const marketInfo = allMarkets.find(market => market.cnpj === item.cnpj_supermercado) || {};
-        const marketAddress = marketInfo.endereco || 'Endereço não disponível';
-
-        return `
-            <div class="product-card ${priceClass}" data-price="${item.preco_produto || 0}">
-                ${priceBadge}
-                
-                <div class="card-header">
-                    <div class="product-name" title="${item.nome_produto || 'Produto sem nome'}">
-                        ${item.nome_produto || 'Produto sem nome'}
-                    </div>
-                </div>
-                
-                <div class="price-section">
-                    <div class="product-price">${price}</div>
-                    <div class="price-subtitle">à vista</div>
-                </div>
-                
-                <div class="market-info">
-                    <div class="market-header">
-                        <i class="fas fa-store"></i>
-                        <div class="market-details">
-                            <div class="supermarket-name">${item.nome_supermercado}</div>
-                            <div class="supermarket-address" title="${marketAddress}">
-                                <i class="fas fa-map-marker-alt"></i>
-                                ${marketAddress}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <ul class="product-details">
-                    <li class="detail-item">
-                        <i class="fas fa-weight-hanging"></i>
-                        <div class="detail-content">
-                            <span class="detail-label">Embalagem</span>
-                            <span class="detail-value">${item.tipo_unidade || 'UN'} (${item.unidade_medida || 'N/A'})</span>
-                        </div>
-                    </li>
-                    
-                    <li class="detail-item">
-                        <i class="fas fa-calendar-alt"></i>
-                        <div class="detail-content">
-                            <span class="detail-label">Última Venda</span>
-                            <span class="detail-value">${date}</span>
-                        </div>
-                    </li>
-                    
-                    <li class="detail-item">
-                        <i class="fas fa-barcode"></i>
-                        <div class="detail-content">
-                            <span class="detail-label">Código</span>
-                            <span class="detail-value code">${item.codigo_barras || 'Sem código'}</span>
-                        </div>
-                    </li>
-                </ul>
-                
-                <div class="card-actions">
-                    <button class="action-btn compare-btn" title="Comparar preço" onclick="handleCompareProduct('${item.codigo_barras || ''}')">
-                        <i class="fas fa-chart-bar"></i>
-                    </button>
-                    <button class="action-btn favorite-btn" title="Favoritar" onclick="handleFavoriteProduct('${item.id || ''}')">
-                        <i class="far fa-heart"></i>
-                    </button>
-                    <button class="action-btn share-btn" title="Compartilhar" onclick="handleShareProduct('${item.nome_produto || ''}', ${item.preco_produto || 0})">
-                        <i class="fas fa-share-alt"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-    };
-
-    // Funções de ação dos botões
-    window.handleCompareProduct = (barcode) => {
-        showNotification(`Produto ${barcode} adicionado à comparação`, 'info');
-    };
-
-    window.handleFavoriteProduct = (productId) => {
-        showNotification('Produto adicionado aos favoritos', 'success');
-    };
-
-    window.handleShareProduct = (productName, price) => {
-        if (navigator.share) {
-            navigator.share({
-                title: productName,
-                text: `Encontrei ${productName} por R$ ${price?.toFixed(2) || '0,00'}`,
-                url: window.location.href
-            });
-        } else {
-            navigator.clipboard.writeText(`${productName} - R$ ${price?.toFixed(2) || '0,00'}`);
-            showNotification('Link copiado para a área de transferência', 'info');
-        }
+        return `<div class="product-card ${priceClass}" data-price="${item.preco_produto || 0}"><div class="card-header"><div class="product-name">${item.nome_produto || 'Produto sem nome'}</div></div><div class="price-section"><div class="product-price">${price}</div></div><ul class="product-details"><li><i class="fas fa-store"></i> <span class="supermarket-name">${item.nome_supermercado}</span></li><li><i class="fas fa-weight-hanging"></i> ${item.tipo_unidade || 'UN'} (${item.unidade_medida || 'N/A'})</li><li><i class="fas fa-calendar-alt"></i> <span class="sale-date">Última Venda: ${date}</span></li><li><i class="fas fa-barcode"></i> ${item.codigo_barras || 'Sem código'}</li></ul></div>`;
     };
 
     const applyFilters = () => {
@@ -189,27 +89,14 @@ document.addEventListener('DOMContentLoaded', () => {
             resultsGrid.innerHTML = `<div class="empty-state"><h3>Nenhum resultado encontrado</h3><p>Tente ajustar os filtros aplicados</p></div>`;
             return;
         }
-        
-        // Adicionar animação de entrada
-        resultsGrid.style.opacity = '0';
-        resultsGrid.style.transform = 'translateY(20px)';
-        
-        setTimeout(() => {
-            const frag = document.createDocumentFragment();
-            results.forEach((item, index) => {
-                const div = document.createElement('div');
-                div.innerHTML = buildProductCard(item, results);
-                div.firstElementChild.style.animationDelay = `${index * 0.1}s`;
-                frag.appendChild(div.firstElementChild);
-            });
-            resultsGrid.innerHTML = '';
-            resultsGrid.appendChild(frag);
-            
-            // Animar entrada
-            resultsGrid.style.opacity = '1';
-            resultsGrid.style.transform = 'translateY(0)';
-            resultsGrid.style.transition = 'all 0.5s ease';
-        }, 100);
+        const frag = document.createDocumentFragment();
+        results.forEach((item) => {
+            const div = document.createElement('div');
+            div.innerHTML = buildProductCard(item, results);
+            frag.appendChild(div.firstElementChild);
+        });
+        resultsGrid.innerHTML = '';
+        resultsGrid.appendChild(frag);
     };
 
     const updateMarketFilter = (results) => {
@@ -264,18 +151,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSelectionCount();
     };
 
-    const filterMarkets = (searchTerm) => {
-        const cards = document.querySelectorAll('.market-card');
-        const term = searchTerm.toLowerCase();
-        
-        cards.forEach(card => {
-            const marketName = card.querySelector('.market-name').textContent.toLowerCase();
-            const marketAddress = card.querySelector('.market-address').textContent.toLowerCase();
-            const matches = marketName.includes(term) || marketAddress.includes(term);
-            card.style.display = matches ? 'block' : 'none';
-        });
-    };
-
     const performSearch = async (isRealtime = false) => {
         const query = searchInput.value.trim();
         if (query.length < 3) {
@@ -289,10 +164,12 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoader(true);
         resultsGrid.innerHTML = '';
         currentResults = [];
-        resultsFiltersPanel.style.display = 'none';
+        resultsFilters.style.display = 'none';
 
         try {
             let response;
+            // AQUI ESTÁ A CORREÇÃO: Usamos a função `authenticatedFetch` do auth.js
+            // para TODAS as buscas, garantindo que o token seja enviado e o logout não ocorra.
             if (isRealtime) {
                 response = await authenticatedFetch('/api/realtime-search', { 
                     method: 'POST', 
@@ -315,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentResults.length === 0) {
                 showMessage(`Nenhum resultado encontrado para "${query}".`);
             } else {
-                resultsFiltersPanel.style.display = 'block';
+                resultsFilters.style.display = 'block';
                 updateMarketFilter(currentResults);
                 applyFilters();
             }
@@ -331,39 +208,20 @@ document.addEventListener('DOMContentLoaded', () => {
     searchButton.addEventListener('click', () => performSearch(false));
     realtimeSearchButton.addEventListener('click', () => performSearch(true));
     searchInput.addEventListener('keypress', (event) => { if (event.key === 'Enter') performSearch(false); });
-    clearSearchButton.addEventListener('click', () => { 
-        searchInput.value = ''; 
-        resultsGrid.innerHTML = ''; 
-        resultsFiltersPanel.style.display = 'none'; 
-    });
-    marketFilterDropdown.addEventListener('change', applyFilters);
-    sortFilterDropdown.addEventListener('change', applyFilters);
-    clearFiltersButton.addEventListener('click', () => { 
-        marketFilterDropdown.value = 'all'; 
-        sortFilterDropdown.value = 'recent'; 
-        applyFilters(); 
-    });
+    clearSearchButton.addEventListener('click', () => { searchInput.value = ''; resultsGrid.innerHTML = ''; resultsFilters.style.display = 'none'; });
+    marketFilter.addEventListener('change', applyFilters);
+    sortFilter.addEventListener('change', applyFilters);
+    clearFiltersButton.addEventListener('click', () => { marketFilter.value = 'all'; sortFilter.value = 'recent'; applyFilters(); });
     marketSearchInput.addEventListener('input', (e) => filterMarkets(e.target.value));
-    clearMarketSearch.addEventListener('click', () => {
-        marketSearchInput.value = '';
-        filterMarkets('');
-    });
     selectAllMarkets.addEventListener('click', () => {
-        document.querySelectorAll('.market-card input').forEach(cb => { 
-            cb.checked = true; 
-            cb.parentElement.classList.add('selected'); 
-        });
+        document.querySelectorAll('.market-card input').forEach(cb => { cb.checked = true; cb.parentElement.classList.add('selected'); });
         updateSelectionCount();
     });
     deselectAllMarkets.addEventListener('click', () => {
-        document.querySelectorAll('.market-card input').forEach(cb => { 
-            cb.checked = false; 
-            cb.parentElement.classList.remove('selected'); 
-        });
+        document.querySelectorAll('.market-card input').forEach(cb => { cb.checked = false; cb.parentElement.classList.remove('selected'); });
         updateSelectionCount();
     });
 
-    // Inicialização
     loadSupermarkets();
 
     // --- EXPOR RESULTADOS E NOTIFICAR PRICE-SORTER ---
