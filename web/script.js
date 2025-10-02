@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     };
 
-    // Funções de ação dos botões (placeholder)
+    // Funções de ação dos botões
     window.handleCompareProduct = (barcode) => {
         showNotification(`Produto ${barcode} adicionado à comparação`, 'info');
     };
