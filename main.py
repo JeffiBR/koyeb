@@ -1,3 +1,4 @@
+# main.py (completo e corrigido)
 import os
 import asyncio
 from datetime import date, timedelta, datetime
@@ -440,50 +441,59 @@ async def get_user_logs(
     action_type: Optional[str] = Query(None),
     user: UserProfile = Depends(require_page_access('user_logs'))
 ):
-    start_index = (page - 1) * page_size
-    end_index = start_index + page_size - 1
-    
-    # Construir query base - USANDO A TABELA log_de_usuarios CORRETA
-    query = supabase.table('log_de_usuarios').select('*', count='exact')
-    
-    # Aplicar filtros
-    if user_id:
-        query = query.eq('user_id', user_id)
-    if date:
-        query = query.gte('created_at', f'{date}T00:00:00').lte('created_at', f'{date}T23:59:59')
-    if action_type:
-        query = query.eq('action_type', action_type)
-    
-    # Ordenar e paginar
-    response = query.order('created_at', desc=True).range(start_index, end_index).execute()
-    
-    # Processar logs - agora os dados do usuário já estão no próprio log
-    user_logs = []
-    for log in response.data:
-        user_logs.append({
-            'log_id': log['id'],
-            'user_id': log.get('user_id'),
-            'user_name': log.get('user_name') or 'N/A',
-            'user_email': log.get('user_email') or 'N/A',
-            'action_type': log.get('action_type'),
-            'search_term': log.get('search_term'),
-            'selected_markets': log.get('selected_markets'),
-            'result_count': log.get('result_count'),
-            'page_accessed': log.get('page_accessed'),
-            'created_at': log.get('created_at')
-        })
-    
-    return {
-        "data": user_logs,
-        "total_count": response.count,
-        "page": page,
-        "page_size": page_size
-    }
+    try:
+        start_index = (page - 1) * page_size
+        end_index = start_index + page_size - 1
+        
+        # Construir query base
+        query = supabase.table('log_de_usuarios').select('*', count='exact')
+        
+        # Aplicar filtros
+        if user_id:
+            query = query.eq('user_id', user_id)
+        if date:
+            query = query.gte('created_at', f'{date}T00:00:00').lte('created_at', f'{date}T23:59:59')
+        if action_type:
+            query = query.eq('action_type', action_type)
+        
+        # Ordenar e paginar
+        response = query.order('created_at', desc=True).range(start_index, end_index).execute()
+        
+        # Processar logs
+        user_logs = []
+        for log in response.data:
+            user_logs.append({
+                'id': log['id'],  # CORREÇÃO: usar 'id' em vez de 'log_id'
+                'user_id': log.get('user_id'),
+                'user_name': log.get('user_name') or 'N/A',
+                'user_email': log.get('user_email') or 'N/A',
+                'action_type': log.get('action_type'),
+                'search_term': log.get('search_term'),
+                'selected_markets': log.get('selected_markets') or [],
+                'result_count': log.get('result_count'),
+                'page_accessed': log.get('page_accessed'),
+                'created_at': log.get('created_at')
+            })
+        
+        return {
+            "data": user_logs,
+            "total_count": response.count or 0,
+            "page": page,
+            "page_size": page_size
+        }
+    except Exception as e:
+        logging.error(f"Erro ao buscar logs de usuários: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro interno ao buscar logs: {str(e)}")
 
 @app.delete("/api/user-logs/{log_id}")
 async def delete_single_log(log_id: int, user: UserProfile = Depends(require_page_access('user_logs'))):
-    response = supabase.table('log_de_usuarios').delete().eq('id', log_id).execute()
-    return {"message": "Log excluído com sucesso", "deleted_count": len(response.data)}
+    try:
+        response = supabase.table('log_de_usuarios').delete().eq('id', log_id).execute()
+        deleted_count = len(response.data) if response.data else 0
+        return {"message": "Log excluído com sucesso", "deleted_count": deleted_count}
+    except Exception as e:
+        logging.error(f"Erro ao deletar log {log_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao deletar log: {str(e)}")
 
 @app.delete("/api/user-logs")
 async def delete_user_logs(
@@ -491,15 +501,20 @@ async def delete_user_logs(
     date: Optional[str] = Query(None),
     user: UserProfile = Depends(require_page_access('user_logs'))
 ):
-    query = supabase.table('log_de_usuarios').delete()
-    
-    if user_id:
-        query = query.eq('user_id', user_id)
-    if date:
-        query = query.gte('created_at', f'{date}T00:00:00').lte('created_at', f'{date}T23:59:59')
-    
-    response = query.execute()
-    return {"message": "Logs excluídos com sucesso", "deleted_count": len(response.data)}
+    try:
+        query = supabase.table('log_de_usuarios').delete()
+        
+        if user_id:
+            query = query.eq('user_id', user_id)
+        if date:
+            query = query.gte('created_at', f'{date}T00:00:00').lte('created_at', f'{date}T23:59:59')
+        
+        response = query.execute()
+        deleted_count = len(response.data) if response.data else 0
+        return {"message": "Logs excluídos com sucesso", "deleted_count": deleted_count}
+    except Exception as e:
+        logging.error(f"Erro ao deletar logs em lote: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao deletar logs: {str(e)}")
 
 @app.get("/api/user-logs/export")
 async def export_user_logs(
@@ -508,50 +523,57 @@ async def export_user_logs(
     action_type: Optional[str] = Query(None),
     user: UserProfile = Depends(require_page_access('user_logs'))
 ):
-    import csv
-    import io
-    
-    # Buscar todos os logs (sem paginação para exportação)
-    query = supabase.table('log_de_usuarios').select('*')
-    
-    if user_id:
-        query = query.eq('user_id', user_id)
-    if date:
-        query = query.gte('created_at', f'{date}T00:00:00').lte('created_at', f'{date}T23:59:59')
-    if action_type:
-        query = query.eq('action_type', action_type)
-    
-    response = query.order('created_at', desc=True).execute()
-    
-    # Criar CSV em memória
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # Escrever cabeçalho
-    writer.writerow(['ID', 'Usuário', 'Email', 'Ação', 'Termo Pesquisado', 'Mercados', 'Resultados', 'Página Acessada', 'Data/Hora'])
-    
-    # Escrever dados
-    for log in response.data:
-        writer.writerow([
-            log['id'],
-            log.get('user_name', ''),
-            log.get('user_email', ''),
-            log.get('action_type', ''),
-            log.get('search_term', ''),
-            ', '.join(log.get('selected_markets', [])),
-            log.get('result_count', ''),
-            log.get('page_accessed', ''),
-            log.get('created_at', '')
-        ])
-    
-    content = output.getvalue()
-    output.close()
-    
-    return Response(
-        content=content,
-        media_type='text/csv',
-        headers={'Content-Disposition': 'attachment; filename=user_logs.csv'}
-    )
+    try:
+        import csv
+        import io
+        
+        # Buscar todos os logs (sem paginação para exportação)
+        query = supabase.table('log_de_usuarios').select('*')
+        
+        if user_id:
+            query = query.eq('user_id', user_id)
+        if date:
+            query = query.gte('created_at', f'{date}T00:00:00').lte('created_at', f'{date}T23:59:59')
+        if action_type:
+            query = query.eq('action_type', action_type)
+        
+        response = query.order('created_at', desc=True).execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Nenhum log encontrado para exportação")
+        
+        # Criar CSV em memória
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Escrever cabeçalho
+        writer.writerow(['ID', 'Usuário', 'Email', 'Ação', 'Termo Pesquisado', 'Mercados', 'Resultados', 'Página Acessada', 'Data/Hora'])
+        
+        # Escrever dados
+        for log in response.data:
+            writer.writerow([
+                log['id'],
+                log.get('user_name', ''),
+                log.get('user_email', ''),
+                log.get('action_type', ''),
+                log.get('search_term', ''),
+                ', '.join(log.get('selected_markets', [])),
+                log.get('result_count', ''),
+                log.get('page_accessed', ''),
+                log.get('created_at', '')
+            ])
+        
+        content = output.getvalue()
+        output.close()
+        
+        return Response(
+            content=content,
+            media_type='text/csv',
+            headers={'Content-Disposition': f'attachment; filename=user_logs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'}
+        )
+    except Exception as e:
+        logging.error(f"Erro ao exportar logs: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao exportar logs: {str(e)}")
 
 @app.post("/api/user-logs/delete-by-date")
 async def delete_logs_by_date(
@@ -563,7 +585,8 @@ async def delete_logs_by_date(
         
     try:
         response = supabase.table('log_de_usuarios').delete().lte('created_at', request.date.isoformat()).execute()
-        return {"message": f"Logs até a data {request.date.isoformat()} deletados com sucesso."}
+        deleted_count = len(response.data) if response.data else 0
+        return {"message": f"Logs até a data {request.date.isoformat()} deletados com sucesso.", "deleted_count": deleted_count}
     except Exception as e:
         logging.error(f"Erro ao deletar logs por data: {e}")
         raise HTTPException(status_code=500, detail="Erro ao deletar logs.")
@@ -572,11 +595,15 @@ async def delete_logs_by_date(
 
 @app.post("/api/log-page-access")
 async def log_page_access_endpoint(
-    page_key: str,
+    request: dict,
     background_tasks: BackgroundTasks,
     current_user: UserProfile = Depends(get_current_user)
 ):
     """Endpoint para registrar acesso às páginas do sistema."""
+    page_key = request.get('page_key')
+    if not page_key:
+        raise HTTPException(status_code=400, detail="page_key é obrigatório")
+    
     background_tasks.add_task(log_page_access, page_key, current_user)
     return {"message": "Log de acesso registrado"}
 
