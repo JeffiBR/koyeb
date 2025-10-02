@@ -1,5 +1,4 @@
-// user-logs.js (com debug detalhado)
-
+// user-logs.js (corrigido)
 let currentPage = 1;
 const pageSize = 20;
 let totalLogs = 0;
@@ -11,13 +10,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function initializePage() {
-    console.log('📥 Carregando usuários...');
     await loadUsers();
-    console.log('📥 Carregando logs...');
     await loadLogs();
-    console.log('🎯 Configurando event listeners...');
     setupEventListeners();
-    console.log('📝 Registrando acesso à página...');
     await logPageAccess();
 }
 
@@ -32,35 +27,28 @@ function setupEventListeners() {
     
     document.getElementById('prevPage').addEventListener('click', goToPreviousPage);
     document.getElementById('nextPage').addEventListener('click', goToNextPage);
-    
-    document.getElementById('dateFilter').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') applyFilters();
-    });
 }
 
 async function logPageAccess() {
     try {
-        const response = await authenticatedFetch('/api/log-page-access', {
+        await authenticatedFetch('/api/log-page-access', {
             method: 'POST',
             body: JSON.stringify({
                 page_key: 'user_logs'
             })
         });
-        console.log('✅ Acesso à página registrado com sucesso');
+        console.log('✅ Acesso à página registrado');
     } catch (error) {
-        console.error('❌ Erro ao registrar acesso à página:', error);
+        console.error('❌ Erro ao registrar acesso:', error);
     }
 }
 
 async function loadUsers() {
     try {
-        console.log('👥 Fazendo requisição para /api/users...');
         const response = await authenticatedFetch('/api/users');
         
         if (response.ok) {
             const users = await response.json();
-            console.log(`✅ ${users.length} usuários carregados:`, users);
-            
             const userFilter = document.getElementById('userFilter');
             const bulkUser = document.getElementById('bulkUser');
             
@@ -78,20 +66,17 @@ async function loadUsers() {
                 bulkUser.appendChild(bulkOption);
             });
         } else {
-            console.error('❌ Erro ao carregar usuários:', response.status, response.statusText);
-            showNotification('Erro ao carregar lista de usuários.', 'error');
+            throw new Error(`Erro ${response.status}: ${response.statusText}`);
         }
     } catch (error) {
-        console.error('❌ Erro na requisição de usuários:', error);
-        showNotification('Erro de rede ao carregar usuários.', 'error');
+        console.error('Erro ao carregar usuários:', error);
+        showNotification('Erro ao carregar lista de usuários.', 'error');
     }
 }
 
 async function loadLogs() {
     const tbody = document.querySelector('#logsTable tbody');
     tbody.innerHTML = '<tr><td colspan="7" class="loading-state">Carregando logs...</td></tr>';
-    document.getElementById('prevPage').disabled = true;
-    document.getElementById('nextPage').disabled = true;
 
     try {
         const params = new URLSearchParams();
@@ -108,70 +93,44 @@ async function loadLogs() {
             params.set('date', currentFilters.date);
         }
 
-        const url = `/api/user-logs?${params.toString()}`;
-        console.log('📡 Fazendo requisição para:', url);
-        
-        const response = await authenticatedFetch(url);
-        console.log('📨 Resposta da API:', {
-            status: response.status,
-            statusText: response.statusText,
-            ok: response.ok
-        });
+        const response = await authenticatedFetch(`/api/user-logs?${params.toString()}`);
+        console.log('Resposta da API:', response);
 
         if (response.ok) {
             const data = await response.json();
-            console.log('📊 Dados recebidos da API:', {
-                total_count: data.total_count,
-                page: data.page,
-                page_size: data.page_size,
-                data: data.data
-            });
+            console.log('Dados recebidos:', data);
             
             totalLogs = data.total_count || 0;
             displayLogs(data.data || []);
             updatePaginationInfo();
-            
-            console.log(`✅ ${data.data ? data.data.length : 0} logs exibidos de ${totalLogs} totais`);
-        } else if (response.status === 403) {
-            console.error('❌ Acesso negado - sem permissão');
-            displayError('Acesso negado. Você não tem permissão para ver esta página.');
         } else {
-            console.error('❌ Erro na resposta da API:', response.status, response.statusText);
+            const errorText = await response.text();
+            console.error('Erro na API:', errorText);
             throw new Error(`Erro ${response.status}: ${response.statusText}`);
         }
     } catch (error) {
-        console.error('❌ Erro ao carregar logs:', error);
-        if (error.message.includes('Sessão não encontrada')) {
-            displayError('Sessão expirada. Faça login novamente.');
-        } else {
-            displayError('Erro ao carregar os dados dos logs. Verifique o console para mais detalhes.');
-        }
+        console.error('Erro ao carregar logs:', error);
+        displayError('Erro ao carregar os dados dos logs. Verifique o console para mais detalhes.');
     }
 }
 
 function displayError(message) {
     const tbody = document.querySelector('#logsTable tbody');
     tbody.innerHTML = `<tr><td colspan="7" class="loading-state error-state">${message}</td></tr>`;
-    console.error('💥 Erro exibido para o usuário:', message);
 }
 
 function displayLogs(logs) {
     const tbody = document.querySelector('#logsTable tbody');
-    console.log('🎨 Renderizando logs:', logs);
     
     if (!logs || logs.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading-state">Nenhum log encontrado.</td></tr>';
-        console.log('ℹ️ Nenhum log para exibir');
         return;
     }
     
     tbody.innerHTML = logs.map(log => {
-        console.log('📝 Processando log individual:', log);
-        
         const date = new Date(log.created_at);
         const formattedDate = date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR');
         
-        // Formato para exibir os mercados
         let marketsDisplay = 'N/A';
         if (Array.isArray(log.selected_markets) && log.selected_markets.length > 0) {
             marketsDisplay = log.selected_markets.length > 3 
@@ -179,12 +138,10 @@ function displayLogs(logs) {
                 : log.selected_markets.join(', ');
         }
         
-        // Garante que o nome e email do usuário serão exibidos
         const userName = log.user_name || 'Usuário Desconhecido';
         const userEmail = log.user_email || 'N/A';
         const userInitial = userName ? userName.charAt(0).toUpperCase() : 'U';
 
-        // Determina o ícone da ação
         let actionIcon = '';
         let actionColor = '';
         let actionText = '';
@@ -238,22 +195,192 @@ function displayLogs(logs) {
         `;
     }).join('');
     
-    // Adiciona listener para botões de deletar individualmente
     document.querySelectorAll('.delete-log-btn').forEach(button => {
         button.addEventListener('click', function() {
             const logId = this.getAttribute('data-log-id');
             deleteSingleLog(logId);
         });
     });
-    
-    console.log(`✅ ${logs.length} logs renderizados na tabela`);
 }
 
-// ... (o resto das funções permanecem iguais)
+async function deleteSingleLog(logId) {
+    if (!confirm('Tem certeza que deseja deletar este log?')) return;
+
+    try {
+        const response = await authenticatedFetch(`/api/user-logs/${logId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(`Log deletado com sucesso! (${result.deleted_count} excluído)`, 'success');
+            loadLogs();
+        } else {
+            throw new Error('Erro ao deletar log individual');
+        }
+    } catch (error) {
+        console.error('Erro ao deletar log individual:', error);
+        showNotification('Erro ao deletar log individual.', 'error');
+    }
+}
+
+function updatePaginationInfo() {
+    const totalPages = Math.ceil(totalLogs / pageSize);
+    document.getElementById('pageInfo').textContent = `Página ${currentPage} de ${totalPages}`;
+    document.getElementById('prevPage').disabled = currentPage === 1;
+    document.getElementById('nextPage').disabled = currentPage >= totalPages || totalPages === 0;
+}
+
+function goToPreviousPage() {
+    if (currentPage > 1) {
+        currentPage--;
+        loadLogs();
+    }
+}
+
+function goToNextPage() {
+    const totalPages = Math.ceil(totalLogs / pageSize);
+    if (currentPage < totalPages) {
+        currentPage++;
+        loadLogs();
+    }
+}
+
+function applyFilters() {
+    const userFilter = document.getElementById('userFilter').value;
+    const actionFilter = document.getElementById('actionFilter').value;
+    const dateFilter = document.getElementById('dateFilter').value;
+    
+    currentFilters = {};
+    if (userFilter) currentFilters.user_id = userFilter;
+    if (actionFilter) currentFilters.action_type = actionFilter;
+    if (dateFilter) currentFilters.date = dateFilter;
+    
+    currentPage = 1;
+    loadLogs();
+}
+
+function clearFilters() {
+    document.getElementById('userFilter').value = '';
+    document.getElementById('actionFilter').value = '';
+    document.getElementById('dateFilter').value = '';
+    currentFilters = {};
+    currentPage = 1;
+    loadLogs();
+}
+
+async function deleteLogsByDate() {
+    const dateToDelete = prompt('Digite a data (YYYY-MM-DD) para deletar todos os logs *anteriores ou iguais* a esta data:');
+    if (!dateToDelete) return;
+    
+    if (!confirm(`Tem certeza que deseja DELETAR TODOS OS LOGS até ${dateToDelete}? Esta ação é irreversível!`)) return;
+
+    try {
+        const response = await authenticatedFetch('/api/user-logs/delete-by-date', {
+            method: 'POST',
+            body: JSON.stringify({ date: dateToDelete })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(result.message || 'Logs deletados com sucesso!', 'success');
+            loadLogs();
+        } else {
+            throw new Error('Erro ao deletar logs por data.');
+        }
+    } catch (error) {
+        console.error('Erro ao deletar logs por data:', error);
+        showNotification('Erro ao deletar logs por data.', 'error');
+    }
+}
+
+async function deleteLogsByUser() {
+    const userId = document.getElementById('bulkUser').value;
+    if (!userId) {
+        showNotification('Selecione um usuário no campo "Excluir Logs por Usuário" primeiro.', 'warning');
+        return;
+    }
+    
+    const userText = document.getElementById('bulkUser').options[document.getElementById('bulkUser').selectedIndex].text;
+    
+    if (!confirm(`Tem certeza que deseja DELETAR TODOS OS LOGS do usuário "${userText}"? Esta ação é irreversível!`)) return;
+
+    try {
+        const response = await authenticatedFetch(`/api/user-logs?user_id=${userId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(result.message || `Logs do usuário deletados com sucesso! (${result.deleted_count} excluídos)`, 'success');
+            loadLogs();
+        } else {
+            throw new Error('Erro ao deletar logs do usuário.');
+        }
+    } catch (error) {
+        console.error('Erro ao deletar logs do usuário:', error);
+        showNotification('Erro ao deletar logs do usuário.', 'error');
+    }
+}
+
+async function deleteAllLogs() {
+    if (!confirm('Tem certeza que deseja DELETAR TODOS OS LOGS? Esta ação é irreversível e deletará todos os registros!')) return;
+
+    try {
+        const response = await authenticatedFetch('/api/user-logs', {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(result.message || 'Todos os logs foram deletados com sucesso!', 'success');
+            loadLogs();
+        } else {
+            throw new Error('Erro ao deletar todos os logs.');
+        }
+    } catch (error) {
+        console.error('Erro ao deletar todos os logs:', error);
+        showNotification('Erro ao deletar todos os logs.', 'error');
+    }
+}
+
+async function exportLogs() {
+    try {
+        const params = new URLSearchParams();
+        
+        if (currentFilters.user_id) {
+            params.set('user_id', currentFilters.user_id);
+        }
+        if (currentFilters.action_type) {
+            params.set('action_type', currentFilters.action_type);
+        }
+        if (currentFilters.date) {
+            params.set('date', currentFilters.date);
+        }
+
+        const response = await authenticatedFetch(`/api/user-logs/export?${params.toString()}`);
+        
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `logs-usuarios-${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            showNotification('Logs exportados com sucesso!', 'success');
+        } else {
+            throw new Error('Erro ao exportar logs');
+        }
+    } catch (error) {
+        console.error('Erro ao exportar logs:', error);
+        showNotification('Erro ao exportar logs', 'error');
+    }
+}
 
 function showNotification(message, type = 'info') {
-    console.log(`📢 Notificação [${type}]: ${message}`);
-    
     const existingNotification = document.querySelector('.notification');
     if (existingNotification) {
         existingNotification.remove();
@@ -286,7 +413,7 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
-// CSS para melhorar a exibição
+// CSS para notificações
 const style = document.createElement('style');
 style.textContent = `
     .loading-state {
