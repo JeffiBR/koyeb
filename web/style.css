@@ -5335,3 +5335,204 @@ body.light-mode .supermarket-grid::-webkit-scrollbar-track {
     background: var(--border-light);
 }
 
+
+/* ====== ESTILOS ESPECÍFICOS PARA A PÁGINA DE COMPARAÇÃO ====== */
+
+/* Container principal da comparação */
+.compare-container {
+    margin-top: 2rem;
+}
+
+/* Grid de mercados na comparação */
+#supermarketGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 0.75rem;
+    max-height: 350px;
+    overflow-y: auto;
+    padding: 0.5rem;
+    margin: 0 -0.5rem;
+}
+
+/* Inputs da comparação */
+.compare-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.compare-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.compare-input-group label {
+    font-weight: 600;
+    color: var(--muted-dark);
+    font-size: 0.9rem;
+}
+
+body.light-mode .compare-input-group label {
+    color: var(--muted-light);
+}
+
+.compare-input-group textarea,
+.compare-input-group input {
+    padding: 1rem;
+    border: 2px solid var(--border-dark);
+    border-radius: 12px;
+    background: var(--input-dark);
+    color: var(--text-dark);
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    resize: vertical;
+    min-height: 44px;
+}
+
+body.light-mode .compare-input-group textarea,
+body.light-mode .compare-input-group input {
+    background: var(--input-light);
+    color: var(--text-light);
+    border: 2px solid var(--border-light);
+}
+
+.compare-input-group textarea:focus,
+.compare-input-group input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+/* Botão de comparação */
+#compareButton {
+    margin-top: 1rem;
+    width: 100%;
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+}
+
+#compareButton:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+#compareButton:disabled:hover {
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.15);
+    transform: none;
+}
+
+/* Controles de mercado na comparação */
+.market-controls {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.market-search-box {
+    position: relative;
+    flex: 1;
+    min-width: 300px;
+}
+
+.market-search-box i {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted-dark);
+    z-index: 2;
+}
+
+.market-search-box input {
+    width: 100%;
+    padding: 0.875rem 1rem 0.875rem 3rem;
+    border: 2px solid var(--border-dark);
+    border-radius: 10px;
+    background: var(--input-dark);
+    color: var(--text-dark);
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+body.light-mode .market-search-box input {
+    background: var(--input-light);
+    color: var(--text-light);
+    border: 2px solid var(--border-light);
+}
+
+.market-search-box input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.market-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Contador de seleção */
+.selection-count {
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Responsividade */
+@media (max-width: 1024px) {
+    .compare-inputs {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    #supermarketGrid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .market-controls {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .market-search-box {
+        min-width: 100%;
+    }
+    
+    .market-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    #supermarketGrid {
+        grid-template-columns: 1fr;
+        max-height: 300px;
+    }
+    
+    .compare-input-group textarea {
+        min-height: 100px;
+    }
+}
+
+@media (max-width: 480px) {
+    .market-actions {
+        flex-direction: column;
+    }
+    
+    .selection-count {
+        justify-content: center;
+    }
+}
