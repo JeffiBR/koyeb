@@ -33,7 +33,8 @@ ECONOMIZA_ALAGOAS_TOKEN = os.getenv("ECONOMIZA_ALAGOAS_TOKEN")
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://127.0.0.1:5500,http://localhost:8000").split(',')
 
 if not all([SUPABASE_URL, SUPABASE_KEY, SERVICE_ROLE_KEY, ECONOMIZA_ALAGOAS_TOKEN]):
-    raise ValueError("Variáveis de ambiente essenciais não configuradas!")
+    logging.error("Variáveis de ambiente essenciais (SUPABASE_URL, SUPABASE_KEY, SERVICE_ROLE_KEY, ECONOMIZA_ALAGOAS_TOKEN) não estão definidas. Verifique seu arquivo .env")
+    exit(1)
 
 # --- Clientes Supabase ---
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -101,6 +102,7 @@ initial_status = {
     "totalItemsFound": 0, "progresso": "Aguardando início", "report": None
 }
 collection_status: Dict[str, Any] = initial_status.copy()
+
 app.add_middleware(
     CORSMiddleware, 
     allow_origins=ALLOWED_ORIGINS,
@@ -121,13 +123,16 @@ class UserUpdate(BaseModel):
 class ProfileUpdate(BaseModel):
     full_name: str; job_title: str; avatar_url: Optional[str] = None
 class Supermercado(BaseModel):
-    id: Optional[int] = None; nome: str; cnpj: str; endereco: Optional[str] = None  # Campo endereco adicionado
+    id: Optional[int] = None; nome: str; cnpj: str; endereco: Optional[str] = None
 class RealtimeSearchRequest(BaseModel):
     produto: str; cnpjs: List[str]
 class PriceHistoryRequest(BaseModel):
     product_identifier: str; cnpjs: List[str]; end_date: date = Field(default_factory=date.today); start_date: date = Field(default_factory=lambda: date.today() - timedelta(days=29))
 class PruneByCollectionsRequest(BaseModel):
     cnpj: str; collection_ids: List[int]
+class LogDeleteRequest(BaseModel):
+    date: Optional[date] = None
+    user_id: Optional[str] = None
 
 # --------------------------------------------------------------------------
 # --- 5. FUNÇÕES DE LOG CORRIGIDAS ---
@@ -136,24 +141,34 @@ class PruneByCollectionsRequest(BaseModel):
 def log_search(term: str, type: str, cnpjs: Optional[List[str]], count: int, user: Optional[UserProfile] = None):
     """Função para registrar logs de busca, rodando em background."""
     try:
-        # Buscar informações completas do usuário se disponível
         user_id = user.id if user else None
         user_name = None
         user_email = None
         
         if user_id:
             try:
-                # Buscar informações completas do perfil
-                profile_response = supabase.table('profiles').select('full_name').eq('id', user_id).single().execute()
+                # Buscar informações completas do perfil do usuário
+                profile_response = supabase_admin.table('profiles').select('full_name').eq('id', user_id).single().execute()
                 if profile_response.data:
                     user_name = profile_response.data.get('full_name')
                 
-                # Buscar email do usuário
-                user_response = supabase.auth.admin.get_user_by_id(user_id)
-                if user_response.user:
-                    user_email = user_response.user.email
+                # Buscar email do usuário do Auth
+                auth_response = supabase_admin.auth.admin.get_user_by_id(user_id)
+                if auth_response.user:
+                    user_email = auth_response.user.email
+                    # Se não encontrou nome no perfil, usar email como nome
+                    if not user_name:
+                        user_name = user_email
             except Exception as e:
                 logging.error(f"Erro ao buscar informações do usuário {user_id}: {e}")
+                # Tentar buscar apenas o email como fallback
+                try:
+                    auth_response = supabase_admin.auth.admin.get_user_by_id(user_id)
+                    if auth_response.user:
+                        user_name = auth_response.user.email
+                        user_email = auth_response.user.email
+                except Exception as auth_error:
+                    logging.error(f"Erro ao buscar email do usuário {user_id}: {auth_error}")
         
         log_data = {
             "user_id": user_id,
@@ -167,8 +182,45 @@ def log_search(term: str, type: str, cnpjs: Optional[List[str]], count: int, use
         
         # Usar supabase_admin para garantir permissões
         supabase_admin.table('log_de_usuarios').insert(log_data).execute()
+        logging.info(f"Log de busca salvo para usuário {user_id}: {term}")
+        
     except Exception as e: 
         logging.error(f"Erro ao salvar log de busca: {e}")
+
+def log_page_access(page_key: str, user: UserProfile):
+    """Função para registrar o acesso à página, rodando em background."""
+    try:
+        user_name = None
+        user_email = None
+        
+        if user.id:
+            try:
+                # Buscar informações completas do perfil
+                profile_response = supabase_admin.table('profiles').select('full_name').eq('id', user.id).single().execute()
+                if profile_response.data:
+                    user_name = profile_response.data.get('full_name')
+                
+                # Buscar email do usuário
+                auth_response = supabase_admin.auth.admin.get_user_by_id(user.id)
+                if auth_response.user:
+                    user_email = auth_response.user.email
+                    # Se não encontrou nome no perfil, usar email como nome
+                    if not user_name:
+                        user_name = user_email
+            except Exception as e:
+                logging.error(f"Erro ao buscar informações do usuário {user.id}: {e}")
+        
+        log_data = {
+            "user_id": user.id,
+            "user_name": user_name,
+            "user_email": user_email,
+            "action_type": "access",
+            "page_accessed": page_key,
+        }
+        supabase_admin.table('log_de_usuarios').insert(log_data).execute()
+        logging.info(f"Log de acesso salvo para usuário {user.id}: {page_key}")
+    except Exception as e:
+        logging.error(f"Erro ao salvar log de acesso à página {page_key} para {user.id}: {e}")
 
 # --------------------------------------------------------------------------
 # --- 6. ENDPOINTS DA APLICAÇÃO ---
@@ -278,7 +330,6 @@ async def list_supermarkets_admin(user: UserProfile = Depends(get_current_user))
 
 @app.post("/api/supermarkets", status_code=201, response_model=Supermercado)
 async def create_supermarket(market: Supermercado, user: UserProfile = Depends(require_page_access('markets'))):
-    # Remove campos None para evitar problemas com o banco
     market_data = market.dict(exclude={'id'})
     market_data = {k: v for k, v in market_data.items() if v is not None}
     
@@ -287,7 +338,6 @@ async def create_supermarket(market: Supermercado, user: UserProfile = Depends(r
 
 @app.put("/api/supermarkets/{id}", response_model=Supermercado)
 async def update_supermarket(id: int, market: Supermercado, user: UserProfile = Depends(require_page_access('markets'))):
-    # Remove campos None e o id
     market_data = market.dict(exclude={'id'})
     market_data = {k: v for k, v in market_data.items() if v is not None}
     
@@ -460,6 +510,32 @@ async def export_user_logs(
         headers={'Content-Disposition': 'attachment; filename=user_logs.csv'}
     )
 
+@app.post("/api/user-logs/delete-by-date")
+async def delete_logs_by_date(
+    request: LogDeleteRequest,
+    user: UserProfile = Depends(require_page_access('user_logs'))
+):
+    if not request.date:
+        raise HTTPException(status_code=400, detail="Data é obrigatória para esta operação.")
+        
+    try:
+        response = supabase.table('log_de_usuarios').delete().lte('created_at', request.date.isoformat()).execute()
+        return {"message": f"Logs até a data {request.date.isoformat()} deletados com sucesso."}
+    except Exception as e:
+        logging.error(f"Erro ao deletar logs por data: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao deletar logs.")
+
+# --- NOVO ENDPOINT PARA LOG DE ACESSO ÀS PÁGINAS ---
+@app.post("/api/log-page-access")
+async def log_page_access_endpoint(
+    page_key: str,
+    background_tasks: BackgroundTasks,
+    current_user: UserProfile = Depends(get_current_user)
+):
+    """Endpoint para registrar acesso às páginas do sistema."""
+    background_tasks.add_task(log_page_access, page_key, current_user)
+    return {"message": "Log de acesso registrado"}
+
 # --- Endpoints Públicos e de Usuário Logado ---
 @app.get("/api/products-log")
 async def get_products_log(page: int = 1, page_size: int = 50, user: UserProfile = Depends(require_page_access('product_log'))):
@@ -480,7 +556,7 @@ async def search_products(
     if cnpjs: query = query.in_('cnpj_supermercado', cnpjs)
     response = query.limit(500).execute()
     
-    # Log da busca com user_id se disponível
+    # Log da busca com user se disponível
     background_tasks.add_task(log_search, q, 'database', cnpjs, len(response.data), current_user)
     
     if not response.data: return {"results": []}
@@ -515,7 +591,7 @@ async def realtime_search(
         elif resultado:
             resultados_finais.extend(resultado)
     
-    # Log da busca em tempo real com user_id se disponível
+    # Log da busca em tempo real com user se disponível
     background_tasks.add_task(log_search, request.produto, 'realtime', request.cnpjs, len(resultados_finais), current_user)
     
     return {"results": sorted(resultados_finais, key=lambda x: x.get('preco_produto', float('inf')))}
@@ -583,3 +659,11 @@ async def get_dashboard_bargains(start_date: date, end_date: date, cnpjs: Option
     
 # --- Servir o Frontend ---
 app.mount("/", StaticFiles(directory="web", html=True), name="static")
+
+# --------------------------------------------------------------------------
+# --- 7. ENDPOINT RAIZ (Sanity Check) ---
+# --------------------------------------------------------------------------
+
+@app.get("/")
+def read_root():
+    return {"message": "Bem-vindo à API de Preços AL - Versão 3.1.2"}
