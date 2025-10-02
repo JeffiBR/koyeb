@@ -13,6 +13,7 @@ async function initializePage() {
     await loadUsers();
     await loadLogs();
     setupEventListeners();
+    logPageAccess(); // Registrar acesso à página
 }
 
 function setupEventListeners() {
@@ -36,6 +37,22 @@ function setupEventListeners() {
     });
 }
 
+// Registrar acesso à página de logs
+function logPageAccess() {
+    fetch('/api/log-page-access', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({
+            page_key: 'user_logs'
+        })
+    }).catch(error => {
+        console.error('Erro ao registrar acesso à página:', error);
+    });
+}
+
 async function loadUsers() {
     try {
         const response = await fetch('/api/users', {
@@ -52,8 +69,10 @@ async function loadUsers() {
             users.forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.id;
-                // Usar email como fallback se full_name não existir
-                option.textContent = user.full_name || user.email; 
+                // Priorizar full_name, usar email como fallback
+                const displayName = user.full_name || user.email || `Usuário ${user.id.substring(0, 8)}`;
+                option.textContent = displayName;
+                option.setAttribute('data-email', user.email || '');
                 userFilter.appendChild(option);
             });
         } else {
@@ -258,7 +277,7 @@ function applyFilters() {
     currentFilters = {};
     if (userFilter) currentFilters.user_id = userFilter;
     if (actionFilter) currentFilters.action_type = actionFilter;
-    if (dateFilter) currentFilters.date = dateFilter; // API espera 'date' não 'date_filter'
+    if (dateFilter) currentFilters.date = dateFilter;
     
     currentPage = 1;
     loadLogs();
@@ -370,7 +389,7 @@ async function exportLogs() {
             params.set('action_type', currentFilters.action_type);
         }
         if (currentFilters.date) {
-            params.set('date_filter', currentFilters.date);
+            params.set('date', currentFilters.date);
         }
 
         const response = await fetch(`/api/user-logs/export?${params.toString()}`, {
@@ -451,3 +470,66 @@ function getToken() {
     // Fallback para sessionStorage ou outros métodos
     return sessionStorage.getItem('supabase.auth.token') || '';
 }
+
+// Adicionar CSS para melhorar a exibição
+const style = document.createElement('style');
+style.textContent = `
+    .loading-state {
+        text-align: center;
+        padding: 2rem;
+        color: var(--muted-dark);
+    }
+    
+    .error-state {
+        color: var(--error);
+        background-color: rgba(239, 68, 68, 0.1);
+    }
+    
+    .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        color: white;
+        z-index: 1000;
+        transform: translateX(400px);
+        transition: transform 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        max-width: 400px;
+    }
+    
+    .notification.show {
+        transform: translateX(0);
+    }
+    
+    .notification.success {
+        background-color: var(--success);
+    }
+    
+    .notification.error {
+        background-color: var(--error);
+    }
+    
+    .notification.warning {
+        background-color: var(--warning);
+        color: var(--text);
+    }
+    
+    .notification.info {
+        background-color: var(--info);
+    }
+    
+    .badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        color: white;
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+`;
+document.head.appendChild(style);
