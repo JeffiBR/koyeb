@@ -38,42 +38,42 @@ function setupEventListeners() {
 }
 
 // Registrar acesso à página de logs
-function logPageAccess() {
-    fetch('/api/log-page-access', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${getToken()}`
-        },
-        body: JSON.stringify({
-            page_key: 'user_logs'
-        })
-    }).catch(error => {
+async function logPageAccess() {
+    try {
+        await authenticatedFetch('/api/log-page-access', {
+            method: 'POST',
+            body: JSON.stringify({
+                page_key: 'user_logs'
+            })
+        });
+    } catch (error) {
         console.error('Erro ao registrar acesso à página:', error);
-    });
+    }
 }
 
 async function loadUsers() {
     try {
-        const response = await fetch('/api/users', {
-            headers: {
-                'Authorization': `Bearer ${getToken()}`
-            }
-        });
+        const response = await authenticatedFetch('/api/users');
         
         if (response.ok) {
             const users = await response.json();
             const userFilter = document.getElementById('userFilter');
+            const bulkUser = document.getElementById('bulkUser');
+            
             userFilter.innerHTML = '<option value="">Todos os Usuários</option>';
+            bulkUser.innerHTML = '<option value="">Selecionar usuário...</option>';
             
             users.forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.id;
-                // Priorizar full_name, usar email como fallback
                 const displayName = user.full_name || user.email || `Usuário ${user.id.substring(0, 8)}`;
                 option.textContent = displayName;
                 option.setAttribute('data-email', user.email || '');
                 userFilter.appendChild(option);
+                
+                // Adicionar também ao select de ações em lote
+                const bulkOption = option.cloneNode(true);
+                bulkUser.appendChild(bulkOption);
             });
         } else {
             showNotification('Erro ao carregar lista de usuários.', 'error');
@@ -108,15 +108,10 @@ async function loadLogs() {
             params.set('date', currentFilters.date);
         }
 
-        const response = await fetch(`/api/user-logs?${params.toString()}`, {
-            headers: {
-                'Authorization': `Bearer ${getToken()}`
-            }
-        });
+        const response = await authenticatedFetch(`/api/user-logs?${params.toString()}`);
 
         if (response.ok) {
             const data = await response.json();
-            // A API retorna data.data e data.total_count
             totalLogs = data.total_count || 0;
             displayLogs(data.data || []);
             updatePaginationInfo();
@@ -127,7 +122,11 @@ async function loadLogs() {
         }
     } catch (error) {
         console.error('Erro ao carregar logs:', error);
-        displayError('Erro ao carregar os dados dos logs. Verifique a conexão com a API.');
+        if (error.message.includes('Sessão não encontrada')) {
+            displayError('Sessão expirada. Faça login novamente.');
+        } else {
+            displayError('Erro ao carregar os dados dos logs. Verifique a conexão com a API.');
+        }
     }
 }
 
@@ -227,11 +226,8 @@ async function deleteSingleLog(logId) {
     if (!confirm('Tem certeza que deseja deletar este log?')) return;
 
     try {
-        const response = await fetch(`/api/user-logs/${logId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${getToken()}`
-            }
+        const response = await authenticatedFetch(`/api/user-logs/${logId}`, {
+            method: 'DELETE'
         });
         
         if (response.ok) {
@@ -299,12 +295,8 @@ async function deleteLogsByDate() {
     if (!confirm(`Tem certeza que deseja DELETAR TODOS OS LOGS até ${dateToDelete}? Esta ação é irreversível!`)) return;
 
     try {
-        const response = await fetch('/api/user-logs/delete-by-date', {
+        const response = await authenticatedFetch('/api/user-logs/delete-by-date', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${getToken()}`
-            },
             body: JSON.stringify({ date: dateToDelete })
         });
         
@@ -322,22 +314,19 @@ async function deleteLogsByDate() {
 }
 
 async function deleteLogsByUser() {
-    const userId = document.getElementById('userFilter').value;
+    const userId = document.getElementById('bulkUser').value;
     if (!userId) {
-        showNotification('Selecione um usuário no filtro primeiro.', 'warning');
+        showNotification('Selecione um usuário no campo "Excluir Logs por Usuário" primeiro.', 'warning');
         return;
     }
     
-    const userText = document.getElementById('userFilter').options[document.getElementById('userFilter').selectedIndex].text;
+    const userText = document.getElementById('bulkUser').options[document.getElementById('bulkUser').selectedIndex].text;
     
     if (!confirm(`Tem certeza que deseja DELETAR TODOS OS LOGS do usuário "${userText}"? Esta ação é irreversível!`)) return;
 
     try {
-        const response = await fetch(`/api/user-logs?user_id=${userId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${getToken()}`
-            }
+        const response = await authenticatedFetch(`/api/user-logs?user_id=${userId}`, {
+            method: 'DELETE'
         });
         
         if (response.ok) {
@@ -357,11 +346,8 @@ async function deleteAllLogs() {
     if (!confirm('Tem certeza que deseja DELETAR TODOS OS LOGS? Esta ação é irreversível e deletará todos os registros!')) return;
 
     try {
-        const response = await fetch('/api/user-logs', {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${getToken()}`
-            }
+        const response = await authenticatedFetch('/api/user-logs', {
+            method: 'DELETE'
         });
         
         if (response.ok) {
@@ -392,11 +378,7 @@ async function exportLogs() {
             params.set('date', currentFilters.date);
         }
 
-        const response = await fetch(`/api/user-logs/export?${params.toString()}`, {
-            headers: {
-                'Authorization': `Bearer ${getToken()}`
-            }
-        });
+        const response = await authenticatedFetch(`/api/user-logs/export?${params.toString()}`);
         
         if (response.ok) {
             const blob = await response.blob();
@@ -452,23 +434,6 @@ function showNotification(message, type = 'info') {
             }
         }, 300);
     }, 5000);
-}
-
-// Função auxiliar para obter o token
-function getToken() {
-    // Tenta obter o token do localStorage
-    const authData = localStorage.getItem('supabase.auth.token');
-    if (authData) {
-        try {
-            const parsed = JSON.parse(authData);
-            return parsed.access_token || parsed;
-        } catch (e) {
-            return authData;
-        }
-    }
-    
-    // Fallback para sessionStorage ou outros métodos
-    return sessionStorage.getItem('supabase.auth.token') || '';
 }
 
 // Adicionar CSS para melhorar a exibição
