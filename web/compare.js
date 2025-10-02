@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
             marketCard.innerHTML = `
                 <div class="market-info">
                     <div class="market-name">${market.nome}</div>
-                    <div class="market-cnpj">${market.cnpj}</div>
+                    <div class="market-address">${market.endereco || 'Endereço não disponível'}</div>
                 </div>
             `;
             
@@ -277,9 +277,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 const product = productsMap.get(productKey);
+                const market = allMarkets.find(m => m.cnpj === item.cnpj_supermercado);
                 product.prices.push({
                     marketCnpj: item.cnpj_supermercado,
-                    marketName: allMarkets.find(m => m.cnpj === item.cnpj_supermercado)?.nome || item.cnpj_supermercado,
+                    marketName: market?.nome || item.cnpj_supermercado,
+                    marketAddress: market?.endereco || 'Endereço não disponível',
                     price: item.preco_produto || 0,
                     lastUpdate: item.data_ultima_venda || new Date().toISOString(),
                     available: item.disponivel || false,
@@ -391,6 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="price-row unavailable">
                     <div class="market-info">
                         <span class="market-name">${priceData.marketName}</span>
+                        <span class="market-address">${priceData.marketAddress}</span>
                         <span class="last-sale-date">${priceData.lastSaleDate}</span>
                     </div>
                     <div class="price-info">
@@ -407,6 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="price-row ${differenceClass}">
                 <div class="market-info">
                     <span class="market-name">${priceData.marketName}</span>
+                    <span class="market-address">${priceData.marketAddress}</span>
                     <span class="last-sale-date">${priceData.lastSaleDate}</span>
                 </div>
                 <div class="price-info">
