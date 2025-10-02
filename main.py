@@ -133,6 +133,11 @@ class PruneByCollectionsRequest(BaseModel):
 class LogDeleteRequest(BaseModel):
     date: Optional[date] = None
     user_id: Optional[str] = None
+class CustomActionRequest(BaseModel):
+    action_type: str
+    page: str
+    details: Dict[str, Any] = Field(default_factory=dict)
+    timestamp: str
 
 # --------------------------------------------------------------------------
 # --- 5. FUNÇÕES DE LOG CORRIGIDAS ---
@@ -221,6 +226,44 @@ def log_page_access(page_key: str, user: UserProfile):
         logging.info(f"Log de acesso salvo para usuário {user.id}: {page_key}")
     except Exception as e:
         logging.error(f"Erro ao salvar log de acesso à página {page_key} para {user.id}: {e}")
+
+def log_custom_action_internal(request: CustomActionRequest, user: Optional[UserProfile]):
+    """Função interna para registrar ações customizadas."""
+    try:
+        user_id = user.id if user else None
+        user_name = None
+        user_email = None
+        
+        if user_id:
+            try:
+                # Buscar informações do usuário
+                profile_response = supabase_admin.table('profiles').select('full_name').eq('id', user_id).single().execute()
+                if profile_response.data:
+                    user_name = profile_response.data.get('full_name')
+                
+                auth_response = supabase_admin.auth.admin.get_user_by_id(user_id)
+                if auth_response.user:
+                    user_email = auth_response.user.email
+                    if not user_name:
+                        user_name = user_email
+            except Exception as e:
+                logging.error(f"Erro ao buscar informações do usuário {user_id}: {e}")
+        
+        log_data = {
+            "user_id": user_id,
+            "user_name": user_name,
+            "user_email": user_email,
+            "action_type": request.action_type,
+            "page_accessed": request.page,
+            "details": request.details,
+            "created_at": request.timestamp
+        }
+        
+        supabase_admin.table('log_de_usuarios').insert(log_data).execute()
+        logging.info(f"Ação customizada registrada: {request.action_type} para usuário {user_id}")
+        
+    except Exception as e:
+        logging.error(f"Erro ao salvar ação customizada: {e}")
 
 # --------------------------------------------------------------------------
 # --- 6. ENDPOINTS DA APLICAÇÃO ---
@@ -525,7 +568,8 @@ async def delete_logs_by_date(
         logging.error(f"Erro ao deletar logs por data: {e}")
         raise HTTPException(status_code=500, detail="Erro ao deletar logs.")
 
-# --- NOVO ENDPOINT PARA LOG DE ACESSO ÀS PÁGINAS ---
+# --- NOVOS ENDPOINTS PARA MONITORAMENTO COMPLETO ---
+
 @app.post("/api/log-page-access")
 async def log_page_access_endpoint(
     page_key: str,
@@ -535,6 +579,62 @@ async def log_page_access_endpoint(
     """Endpoint para registrar acesso às páginas do sistema."""
     background_tasks.add_task(log_page_access, page_key, current_user)
     return {"message": "Log de acesso registrado"}
+
+@app.post("/api/log-custom-action")
+async def log_custom_action(
+    request: CustomActionRequest,
+    background_tasks: BackgroundTasks,
+    current_user: UserProfile = Depends(get_current_user_optional)
+):
+    """Endpoint para registrar ações customizadas dos usuários."""
+    background_tasks.add_task(log_custom_action_internal, request, current_user)
+    return {"message": "Ação customizada registrada"}
+
+@app.get("/api/usage-statistics")
+async def get_usage_statistics(
+    start_date: date = Query(..., description="Data de início (YYYY-MM-DD)"),
+    end_date: date = Query(..., description="Data final (YYYY-MM-DD)"),
+    user: UserProfile = Depends(require_page_access('user_logs'))
+):
+    """Endpoint para obter estatísticas de uso do sistema."""
+    try:
+        # Estatísticas de acesso por página
+        page_stats_response = supabase_admin.table('log_de_usuarios') \
+            .select('page_accessed', count='exact') \
+            .eq('action_type', 'access') \
+            .gte('created_at', str(start_date)) \
+            .lte('created_at', f'{end_date} 23:59:59') \
+            .execute()
+        
+        # Estatísticas de usuários ativos
+        active_users_response = supabase_admin.table('log_de_usuarios') \
+            .select('user_id', count='exact') \
+            .gte('created_at', str(start_date)) \
+            .lte('created_at', f'{end_date} 23:59:59') \
+            .execute()
+        
+        # Top ações
+        top_actions_response = supabase_admin.table('log_de_usuarios') \
+            .select('action_type', count='exact') \
+            .gte('created_at', str(start_date)) \
+            .lte('created_at', f'{end_date} 23:59:59') \
+            .execute()
+        
+        statistics = {
+            "period": {
+                "start_date": str(start_date),
+                "end_date": str(end_date)
+            },
+            "page_access": page_stats_response.count or 0,
+            "active_users": active_users_response.count or 0,
+            "top_actions": top_actions_response.data or []
+        }
+        
+        return statistics
+        
+    except Exception as e:
+        logging.error(f"Erro ao buscar estatísticas de uso: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao buscar estatísticas de uso")
 
 # --- Endpoints Públicos e de Usuário Logado ---
 @app.get("/api/products-log")
