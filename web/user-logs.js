@@ -1,4 +1,4 @@
-// user-logs.js
+// user-logs.js (versão corrigida)
 
 let currentPage = 1;
 const pageSize = 20;
@@ -13,31 +13,26 @@ async function initializePage() {
     await loadUsers();
     await loadLogs();
     setupEventListeners();
-    logPageAccess(); // Registrar acesso à página
+    logPageAccess();
 }
 
 function setupEventListeners() {
-    // Filtros
     document.getElementById('filterButton').addEventListener('click', applyFilters);
     document.getElementById('clearFilters').addEventListener('click', clearFilters);
     document.getElementById('exportButton').addEventListener('click', exportLogs);
     
-    // Ações em lote
     document.getElementById('deleteByDate').addEventListener('click', deleteLogsByDate);
     document.getElementById('deleteByUser').addEventListener('click', deleteLogsByUser);
     document.getElementById('deleteAll').addEventListener('click', deleteAllLogs);
     
-    // Paginação
     document.getElementById('prevPage').addEventListener('click', goToPreviousPage);
     document.getElementById('nextPage').addEventListener('click', goToNextPage);
     
-    // Enter nos filtros
     document.getElementById('dateFilter').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') applyFilters();
     });
 }
 
-// Registrar acesso à página de logs
 async function logPageAccess() {
     try {
         await authenticatedFetch('/api/log-page-access', {
@@ -68,16 +63,13 @@ async function loadUsers() {
                 option.value = user.id;
                 const displayName = user.full_name || user.email || `Usuário ${user.id.substring(0, 8)}`;
                 option.textContent = displayName;
-                option.setAttribute('data-email', user.email || '');
                 userFilter.appendChild(option);
                 
-                // Adicionar também ao select de ações em lote
                 const bulkOption = option.cloneNode(true);
                 bulkUser.appendChild(bulkOption);
             });
         } else {
             showNotification('Erro ao carregar lista de usuários.', 'error');
-            console.error('Erro ao carregar usuários:', response.statusText);
         }
     } catch (error) {
         console.error('Erro na requisição de usuários:', error);
@@ -92,12 +84,10 @@ async function loadLogs() {
     document.getElementById('nextPage').disabled = true;
 
     try {
-        // Construir URL com parâmetros corretos para a API
         const params = new URLSearchParams();
         params.set('page', currentPage);
         params.set('page_size', pageSize);
         
-        // Aplicar filtros com nomes corretos para a API
         if (currentFilters.user_id) {
             params.set('user_id', currentFilters.user_id);
         }
@@ -112,6 +102,7 @@ async function loadLogs() {
 
         if (response.ok) {
             const data = await response.json();
+            console.log('Dados recebidos da API:', data); // Para debug
             totalLogs = data.total_count || 0;
             displayLogs(data.data || []);
             updatePaginationInfo();
@@ -125,7 +116,7 @@ async function loadLogs() {
         if (error.message.includes('Sessão não encontrada')) {
             displayError('Sessão expirada. Faça login novamente.');
         } else {
-            displayError('Erro ao carregar os dados dos logs. Verifique a conexão com a API.');
+            displayError('Erro ao carregar os dados dos logs.');
         }
     }
 }
@@ -182,6 +173,7 @@ function displayLogs(logs) {
             actionText = log.action_type || 'Outra Ação';
         }
         
+        // CORREÇÃO: usar log.id em vez de log.log_id
         return `
             <tr>
                 <td>
@@ -205,7 +197,7 @@ function displayLogs(logs) {
                 <td>${log.result_count !== undefined && log.result_count !== null ? log.result_count : 'N/A'}</td>
                 <td>${formattedDate}</td>
                 <td>
-                    <button class="btn icon-only danger delete-log-btn" data-log-id="${log.log_id}" title="Deletar Log">
+                    <button class="btn icon-only danger delete-log-btn" data-log-id="${log.id}" title="Deletar Log">
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>
@@ -233,7 +225,7 @@ async function deleteSingleLog(logId) {
         if (response.ok) {
             const result = await response.json();
             showNotification(`Log deletado com sucesso! (${result.deleted_count} excluído)`, 'success');
-            loadLogs(); // Recarrega a lista
+            loadLogs();
         } else {
             throw new Error('Erro ao deletar log individual');
         }
@@ -303,7 +295,7 @@ async function deleteLogsByDate() {
         if (response.ok) {
             const result = await response.json();
             showNotification(result.message || 'Logs deletados com sucesso!', 'success');
-            loadLogs(); // Recarrega a lista
+            loadLogs();
         } else {
             throw new Error('Erro ao deletar logs por data.');
         }
@@ -332,7 +324,7 @@ async function deleteLogsByUser() {
         if (response.ok) {
             const result = await response.json();
             showNotification(result.message || `Logs do usuário deletados com sucesso! (${result.deleted_count} excluídos)`, 'success');
-            loadLogs(); // Recarrega a lista
+            loadLogs();
         } else {
             throw new Error('Erro ao deletar logs do usuário.');
         }
@@ -353,7 +345,7 @@ async function deleteAllLogs() {
         if (response.ok) {
             const result = await response.json();
             showNotification(result.message || 'Todos os logs foram deletados com sucesso!', 'success');
-            loadLogs(); // Recarrega a lista
+            loadLogs();
         } else {
             throw new Error('Erro ao deletar todos os logs.');
         }
@@ -365,7 +357,6 @@ async function deleteAllLogs() {
 
 async function exportLogs() {
     try {
-        // Construir parâmetros de filtro para exportação
         const params = new URLSearchParams();
         
         if (currentFilters.user_id) {
@@ -401,7 +392,6 @@ async function exportLogs() {
 }
 
 function showNotification(message, type = 'info') {
-    // Remove notificação existente
     const existingNotification = document.querySelector('.notification');
     if (existingNotification) {
         existingNotification.remove();
@@ -422,10 +412,8 @@ function showNotification(message, type = 'info') {
     
     document.body.appendChild(notification);
     
-    // Mostrar notificação
     setTimeout(() => notification.classList.add('show'), 100);
     
-    // Remover após 5 segundos
     setTimeout(() => {
         notification.classList.remove('show');
         setTimeout(() => {
@@ -436,7 +424,7 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
-// Adicionar CSS para melhorar a exibição
+// CSS para melhorar a exibição
 const style = document.createElement('style');
 style.textContent = `
     .loading-state {
