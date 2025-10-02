@@ -47,17 +47,16 @@ async function loadUsers() {
         if (response.ok) {
             const users = await response.json();
             const userFilter = document.getElementById('userFilter');
-            userFilter.innerHTML = '<option value="">Todos os Usuários</option>'; // Opção padrão
+            userFilter.innerHTML = '<option value="">Todos os Usuários</option>';
             
             users.forEach(user => {
-                // Usa o email como texto e o id como valor
                 const option = document.createElement('option');
                 option.value = user.id;
-                option.textContent = user.email; 
+                // Usar email como fallback se full_name não existir
+                option.textContent = user.full_name || user.email; 
                 userFilter.appendChild(option);
             });
         } else {
-            // Lidar com erro
             showNotification('Erro ao carregar lista de usuários.', 'error');
             console.error('Erro ao carregar usuários:', response.statusText);
         }
@@ -68,16 +67,29 @@ async function loadUsers() {
 }
 
 async function loadLogs() {
-    document.querySelector('#logsTable tbody').innerHTML = '<tr><td colspan="7" class="loading-state">Carregando logs...</td></tr>';
+    const tbody = document.querySelector('#logsTable tbody');
+    tbody.innerHTML = '<tr><td colspan="7" class="loading-state">Carregando logs...</td></tr>';
     document.getElementById('prevPage').disabled = true;
     document.getElementById('nextPage').disabled = true;
 
     try {
-        const urlParams = new URLSearchParams(currentFilters);
-        urlParams.set('page', currentPage);
-        urlParams.set('page_size', pageSize);
+        // Construir URL com parâmetros corretos para a API
+        const params = new URLSearchParams();
+        params.set('page', currentPage);
+        params.set('page_size', pageSize);
+        
+        // Aplicar filtros com nomes corretos para a API
+        if (currentFilters.user_id) {
+            params.set('user_id', currentFilters.user_id);
+        }
+        if (currentFilters.action_type) {
+            params.set('action_type', currentFilters.action_type);
+        }
+        if (currentFilters.date) {
+            params.set('date', currentFilters.date);
+        }
 
-        const response = await fetch(`/api/user-logs?${urlParams.toString()}`, {
+        const response = await fetch(`/api/user-logs?${params.toString()}`, {
             headers: {
                 'Authorization': `Bearer ${getToken()}`
             }
@@ -85,17 +97,18 @@ async function loadLogs() {
 
         if (response.ok) {
             const data = await response.json();
-            totalLogs = data.total_logs;
-            displayLogs(data.logs);
+            // A API retorna data.data e data.total_count
+            totalLogs = data.total_count || 0;
+            displayLogs(data.data || []);
             updatePaginationInfo();
         } else if (response.status === 403) {
             displayError('Acesso negado. Você não tem permissão para ver esta página.');
         } else {
-            throw new Error(response.statusText);
+            throw new Error(`Erro ${response.status}: ${response.statusText}`);
         }
     } catch (error) {
         console.error('Erro ao carregar logs:', error);
-        displayError('Erro ao carregar os dados dos logs. Verifique a API.');
+        displayError('Erro ao carregar os dados dos logs. Verifique a conexão com a API.');
     }
 }
 
@@ -106,7 +119,7 @@ function displayError(message) {
 
 function displayLogs(logs) {
     const tbody = document.querySelector('#logsTable tbody');
-    if (logs.length === 0) {
+    if (!logs || logs.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading-state">Nenhum log encontrado.</td></tr>';
         return;
     }
@@ -148,7 +161,7 @@ function displayLogs(logs) {
         } else {
             actionIcon = 'fas fa-info-circle';
             actionColor = 'var(--muted-dark)';
-            actionText = 'Outra Ação';
+            actionText = log.action_type || 'Outra Ação';
         }
         
         return `
@@ -173,7 +186,11 @@ function displayLogs(logs) {
                 <td>${marketsDisplay}</td>
                 <td>${log.result_count !== undefined && log.result_count !== null ? log.result_count : 'N/A'}</td>
                 <td>${formattedDate}</td>
-                <td><button class="btn icon-only danger delete-log-btn" data-log-id="${log.log_id}" title="Deletar Log"><i class="fas fa-trash"></i></button></td>
+                <td>
+                    <button class="btn icon-only danger delete-log-btn" data-log-id="${log.log_id}" title="Deletar Log">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
             </tr>
         `;
     }).join('');
@@ -181,17 +198,41 @@ function displayLogs(logs) {
     // Adiciona listener para botões de deletar individualmente
     document.querySelectorAll('.delete-log-btn').forEach(button => {
         button.addEventListener('click', function() {
-            // Implementação de delete individual (se existir na API)
-            showNotification('Funcionalidade de exclusão individual não implementada na API atual.', 'info');
+            const logId = this.getAttribute('data-log-id');
+            deleteSingleLog(logId);
         });
     });
+}
+
+async function deleteSingleLog(logId) {
+    if (!confirm('Tem certeza que deseja deletar este log?')) return;
+
+    try {
+        const response = await fetch(`/api/user-logs/${logId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`
+            }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(`Log deletado com sucesso! (${result.deleted_count} excluído)`, 'success');
+            loadLogs(); // Recarrega a lista
+        } else {
+            throw new Error('Erro ao deletar log individual');
+        }
+    } catch (error) {
+        console.error('Erro ao deletar log individual:', error);
+        showNotification('Erro ao deletar log individual.', 'error');
+    }
 }
 
 function updatePaginationInfo() {
     const totalPages = Math.ceil(totalLogs / pageSize);
     document.getElementById('pageInfo').textContent = `Página ${currentPage} de ${totalPages}`;
     document.getElementById('prevPage').disabled = currentPage === 1;
-    document.getElementById('nextPage').disabled = currentPage >= totalPages;
+    document.getElementById('nextPage').disabled = currentPage >= totalPages || totalPages === 0;
 }
 
 function goToPreviousPage() {
@@ -217,9 +258,9 @@ function applyFilters() {
     currentFilters = {};
     if (userFilter) currentFilters.user_id = userFilter;
     if (actionFilter) currentFilters.action_type = actionFilter;
-    if (dateFilter) currentFilters.date_filter = dateFilter;
+    if (dateFilter) currentFilters.date = dateFilter; // API espera 'date' não 'date_filter'
     
-    currentPage = 1; // Volta para a primeira página ao aplicar filtros
+    currentPage = 1;
     loadLogs();
 }
 
@@ -239,18 +280,18 @@ async function deleteLogsByDate() {
     if (!confirm(`Tem certeza que deseja DELETAR TODOS OS LOGS até ${dateToDelete}? Esta ação é irreversível!`)) return;
 
     try {
-        const token = getToken();
         const response = await fetch('/api/user-logs/delete-by-date', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${getToken()}`
             },
             body: JSON.stringify({ date: dateToDelete })
         });
         
         if (response.ok) {
-            showNotification('Logs deletados com sucesso!', 'success');
+            const result = await response.json();
+            showNotification(result.message || 'Logs deletados com sucesso!', 'success');
             loadLogs(); // Recarrega a lista
         } else {
             throw new Error('Erro ao deletar logs por data.');
@@ -261,16 +302,80 @@ async function deleteLogsByDate() {
     }
 }
 
-// ... (Implementação de deleteLogsByUser e deleteAllLogs não mostrada para brevidade)
+async function deleteLogsByUser() {
+    const userId = document.getElementById('userFilter').value;
+    if (!userId) {
+        showNotification('Selecione um usuário no filtro primeiro.', 'warning');
+        return;
+    }
+    
+    const userText = document.getElementById('userFilter').options[document.getElementById('userFilter').selectedIndex].text;
+    
+    if (!confirm(`Tem certeza que deseja DELETAR TODOS OS LOGS do usuário "${userText}"? Esta ação é irreversível!`)) return;
+
+    try {
+        const response = await fetch(`/api/user-logs?user_id=${userId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`
+            }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(result.message || `Logs do usuário deletados com sucesso! (${result.deleted_count} excluídos)`, 'success');
+            loadLogs(); // Recarrega a lista
+        } else {
+            throw new Error('Erro ao deletar logs do usuário.');
+        }
+    } catch (error) {
+        console.error('Erro ao deletar logs do usuário:', error);
+        showNotification('Erro ao deletar logs do usuário.', 'error');
+    }
+}
+
+async function deleteAllLogs() {
+    if (!confirm('Tem certeza que deseja DELETAR TODOS OS LOGS? Esta ação é irreversível e deletará todos os registros!')) return;
+
+    try {
+        const response = await fetch('/api/user-logs', {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`
+            }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(result.message || 'Todos os logs foram deletados com sucesso!', 'success');
+            loadLogs(); // Recarrega a lista
+        } else {
+            throw new Error('Erro ao deletar todos os logs.');
+        }
+    } catch (error) {
+        console.error('Erro ao deletar todos os logs:', error);
+        showNotification('Erro ao deletar todos os logs.', 'error');
+    }
+}
 
 async function exportLogs() {
     try {
-        const urlParams = new URLSearchParams(currentFilters);
-        const token = getToken();
+        // Construir parâmetros de filtro para exportação
+        const params = new URLSearchParams();
         
-        const response = await fetch(`/api/user-logs/export?${urlParams.toString()}`, {
+        if (currentFilters.user_id) {
+            params.set('user_id', currentFilters.user_id);
+        }
+        if (currentFilters.action_type) {
+            params.set('action_type', currentFilters.action_type);
+        }
+        if (currentFilters.date) {
+            params.set('date_filter', currentFilters.date);
+        }
+
+        const response = await fetch(`/api/user-logs/export?${params.toString()}`, {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${getToken()}`
             }
         });
         
@@ -279,11 +384,11 @@ async function exportLogs() {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            // Define o nome do arquivo dinamicamente
             a.download = `logs-usuarios-${new Date().toISOString().split('T')[0]}.csv`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
             showNotification('Logs exportados com sucesso!', 'success');
         } else {
             throw new Error('Erro ao exportar logs');
@@ -303,8 +408,14 @@ function showNotification(message, type = 'info') {
     
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
+    
+    let icon = 'info-circle';
+    if (type === 'success') icon = 'check';
+    if (type === 'error') icon = 'exclamation-triangle';
+    if (type === 'warning') icon = 'exclamation';
+    
     notification.innerHTML = `
-        <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info'}"></i>
+        <i class="fas fa-${icon}"></i>
         <span>${message}</span>
     `;
     
@@ -316,11 +427,27 @@ function showNotification(message, type = 'info') {
     // Remover após 5 segundos
     setTimeout(() => {
         notification.classList.remove('show');
-        setTimeout(() => notification.remove(), 300);
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 300);
     }, 5000);
 }
 
-// Função auxiliar para obter o token (já deve existir em auth.js)
+// Função auxiliar para obter o token
 function getToken() {
-    return localStorage.getItem('supabase.auth.token');
+    // Tenta obter o token do localStorage
+    const authData = localStorage.getItem('supabase.auth.token');
+    if (authData) {
+        try {
+            const parsed = JSON.parse(authData);
+            return parsed.access_token || parsed;
+        } catch (e) {
+            return authData;
+        }
+    }
+    
+    // Fallback para sessionStorage ou outros métodos
+    return sessionStorage.getItem('supabase.auth.token') || '';
 }
