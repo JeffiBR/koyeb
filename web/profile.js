@@ -1,4 +1,4 @@
-// profile.js - COMPLETO e ajustado para sempre usar /api/users/me
+// profile.js - COMPLETO E FINAL
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- ELEMENTOS DA UI ---
@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const setupPasswordToggles = () => {
         const setupToggle = (toggleBtn, input) => {
+            if (!toggleBtn || !input) return;
             toggleBtn.addEventListener('click', () => {
                 const type = input.type === 'password' ? 'text' : 'password';
                 input.type = type;
@@ -49,16 +50,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (avatarUrl) {
             const timestamp = Date.now();
             const avatarSrc = `${avatarUrl}?t=${timestamp}`;
-            currentAvatar.src = avatarSrc;
+            if(currentAvatar) currentAvatar.src = avatarSrc;
             if (userAvatar) userAvatar.src = avatarSrc;
         } else {
             const userName = fullNameInput.value || 'Usuário';
             const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=random&color=fff&bold=true`;
-            currentAvatar.src = defaultAvatar;
+            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials )}&background=random&color=fff&bold=true`;
+            if(currentAvatar) currentAvatar.src = defaultAvatar;
             if (userAvatar) userAvatar.src = defaultAvatar;
         }
-        removeAvatarBtn.disabled = !avatarUrl;
+        if(removeAvatarBtn) removeAvatarBtn.disabled = !avatarUrl;
     };
 
     const checkForChanges = () => {
@@ -93,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         hasUnsavedChanges = false;
         discardChangesBtn.style.display = 'none';
-        updateProfileBtn.disabled = false;
+        updateProfileBtn.disabled = true;
         showStatus('', '');
     };
 
@@ -112,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
             jobTitleInput.value = currentUserProfile.job_title || '';
             emailInput.value = currentUserProfile.email || '';
             updateAvatarDisplay(currentUserProfile.avatar_url);
+            checkForChanges();
 
         } catch (error) {
             console.error('Erro ao carregar perfil:', error);
@@ -168,7 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (uploadError) throw uploadError;
 
             const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(uploadData.path);
-            showStatus('Foto enviada com sucesso!', 'success');
             return urlData.publicUrl;
 
         } catch (error) {
@@ -192,7 +193,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- Atualização do Perfil (ajustado) ---
     const handleProfileUpdate = async () => {
         try {
             validateForm();
@@ -202,22 +202,35 @@ document.addEventListener('DOMContentLoaded', () => {
             showStatus('Salvando alterações...', 'info');
 
             let avatarUrl = currentUserProfile?.avatar_url;
-            if (avatarFileInput.files[0]) avatarUrl = await handleAvatarUpload();
-            if (removeAvatarBtn.disabled === false && !avatarFileInput.files[0]) avatarUrl = await removeCurrentAvatar();
+            if (avatarFileInput.files[0]) {
+                avatarUrl = await handleAvatarUpload();
+            } else if (removeAvatarBtn.disabled === false && !avatarFileInput.files[0]) {
+                avatarUrl = await removeCurrentAvatar();
+            }
 
-            const updateData = {
-                full_name: fullNameInput.value.trim(),
-                job_title: jobTitleInput.value.trim()
-            };
-
-            if (avatarUrl !== undefined) updateData.avatar_url = avatarUrl;
-            if (emailInput.value !== currentUserProfile.email) updateData.email = emailInput.value;
+            const updateData = {};
+            if (fullNameInput.value.trim() !== originalProfileData.full_name) {
+                updateData.full_name = fullNameInput.value.trim();
+            }
+            if (jobTitleInput.value.trim() !== (originalProfileData.job_title || '')) {
+                updateData.job_title = jobTitleInput.value.trim();
+            }
+            if (avatarUrl !== currentUserProfile.avatar_url) {
+                updateData.avatar_url = avatarUrl;
+            }
+            if (emailInput.value !== currentUserProfile.email) {
+                updateData.email = emailInput.value;
+            }
             if (newPasswordInput.value) {
                 updateData.new_password = newPasswordInput.value;
                 updateData.current_password = currentPasswordInput.value;
             }
 
-            // 🔥 Forçar sempre /api/users/me
+            if (Object.keys(updateData).length === 0) {
+                showStatus('Nenhuma alteração para salvar.', 'info');
+                return;
+            }
+
             const response = await authenticatedFetch('/api/users/me', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -233,12 +246,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const updatedProfile = await response.json();
             showStatus('Perfil atualizado com sucesso!', 'success');
 
-            updateAvatarDisplay(avatarUrl);
+            // ==================================================================
+            // --- DISPARA O EVENTO PARA ATUALIZAR O MENU DO USUÁRIO ---
+            console.log('🚀 Disparando evento [profileUpdated] para atualizar o menu.');
+            const profileUpdateEvent = new CustomEvent('profileUpdated', {
+                detail: {
+                    avatar_url: updatedProfile.avatar_url,
+                    full_name: updatedProfile.full_name
+                }
+            });
+            window.dispatchEvent(profileUpdateEvent);
+            // ==================================================================
+
             currentUserProfile = { ...currentUserProfile, ...updatedProfile };
             originalProfileData = { ...currentUserProfile };
-
+            
+            updateAvatarDisplay(currentUserProfile.avatar_url);
             avatarFileInput.value = '';
             avatarPreview.style.display = 'none';
+            currentPasswordInput.value = '';
+            newPasswordInput.value = '';
+            confirmPasswordInput.value = '';
+            checkForChanges();
 
         } catch (error) {
             console.error('Erro ao atualizar perfil:', error);
@@ -252,18 +281,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             showStatus(`Erro: ${displayMessage}`, 'error');
         } finally {
-            updateProfileBtn.disabled = false;
+            updateProfileBtn.disabled = !hasUnsavedChanges;
             updateProfileBtn.innerHTML = '<i class="fas fa-save"></i><span>Salvar Todas as Alterações</span>';
-            checkForChanges();
         }
     };
 
     const initializeEventListeners = () => {
         [fullNameInput, jobTitleInput, emailInput, currentPasswordInput, newPasswordInput, confirmPasswordInput].forEach(input => {
-            input.addEventListener('input', checkForChanges);
+            if(input) input.addEventListener('input', checkForChanges);
         });
 
-        avatarFileInput.addEventListener('change', (e) => {
+        if(avatarFileInput) avatarFileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
@@ -278,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
             checkForChanges();
         });
 
-        removeAvatarBtn.addEventListener('click', () => {
+        if(removeAvatarBtn) removeAvatarBtn.addEventListener('click', () => {
             if (confirm('Tem certeza que deseja remover sua foto de perfil?')) {
                 avatarFileInput.value = '';
                 avatarPreview.style.display = 'none';
@@ -288,8 +316,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        updateProfileBtn.addEventListener('click', handleProfileUpdate);
-        discardChangesBtn.addEventListener('click', discardChanges);
+        if(updateProfileBtn) updateProfileBtn.addEventListener('click', handleProfileUpdate);
+        if(discardChangesBtn) discardChangesBtn.addEventListener('click', discardChanges);
         setupPasswordToggles();
     };
 
