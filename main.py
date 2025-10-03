@@ -453,39 +453,53 @@ async def get_my_profile(current_user: UserProfile = Depends(get_current_user)):
         logging.error(f"Erro ao buscar perfil do usuário: {e}")
         raise HTTPException(status_code=500, detail="Erro ao carregar perfil")
 
+# VERSÃO NOVA E CORRIGIDA
 @app.put("/api/users/me")
 async def update_my_profile(profile_data: ProfileUpdateWithCredentials, current_user: UserProfile = Depends(get_current_user)):
     try:
-        # Preparar dados para atualização do perfil
-        profile_update_data = {
-            "full_name": profile_data.full_name,
-            "job_title": profile_data.job_title,
-        }
-        
-        # Incluir avatar_url apenas se não for None
-        if profile_data.avatar_url is not None:
-            profile_update_data["avatar_url"] = profile_data.avatar_url
-        
-        # Remover campos vazios
-        profile_update_data = {k: v for k, v in profile_update_data.items() if v is not None}
-        
-        # Verificar se precisa atualizar email ou senha
+        # 1. Preparar dados para a tabela 'profiles'
+        # Usamos exclude_unset=True para enviar apenas os campos que o frontend mandou
+        profile_update_data = profile_data.dict(exclude_unset=True, exclude={'current_password', 'new_password', 'email'})
+
+        # 2. Lidar com alteração de e-mail e senha
         if profile_data.email or profile_data.new_password:
             if not profile_data.current_password:
-                raise HTTPException(status_code=400, detail="Senha atual é necessária para alterar o e-mail ou a senha.")
-            
+                raise HTTPException(status_code=400, detail="Senha atual é necessária para alterar e-mail ou senha.")
+
             # Verificar a senha atual
             try:
-                user_response = supabase.auth.get_user()
-                current_email = user_response.user.email
-                
-                # Tentar fazer login com a senha atual
-                auth_response = supabase.auth.sign_in_with_password({
-                    "email": current_email,
+                # Tenta fazer login com o e-mail do usuário logado e a senha fornecida
+                await supabase.auth.sign_in_with_password({
+                    "email": current_user.email,
                     "password": profile_data.current_password
                 })
-            except Exception as e:
+            except Exception:
                 raise HTTPException(status_code=400, detail="Senha atual incorreta.")
+
+            # Atualizar e-mail no Supabase Auth
+            if profile_data.email and profile_data.email != current_user.email:
+                await supabase.auth.update_user({"email": profile_data.email})
+
+            # Atualizar senha no Supabase Auth
+            if profile_data.new_password:
+                if len(profile_data.new_password) < 6:
+                    raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres.")
+                await supabase.auth.update_user({"password": profile_data.new_password})
+
+        # 3. Atualizar dados na tabela 'profiles' se houver algo para atualizar
+        if profile_update_data:
+            response = await supabase.table('profiles').update(profile_update_data).eq('id', current_user.id).select().single().execute()
+            return response.data
+
+        # 4. Se nada foi alterado em 'profiles', buscar e retornar o perfil atual para confirmar o sucesso
+        response = await supabase.table('profiles').select('*').eq('id', current_user.id).single().execute()
+        return response.data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Erro CRÍTICO ao atualizar perfil: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro interno ao atualizar perfil: {str(e)}")
         
         # Atualizar email se fornecido
         if profile_data.email:
@@ -974,5 +988,6 @@ app.mount("/", StaticFiles(directory="web", html=True), name="static")
 @app.get("/")
 def read_root():
     return {"message": "Bem-vindo à API de Preços AL - Versão 3.1.2"}
+
 
 
