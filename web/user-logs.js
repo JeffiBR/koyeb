@@ -1,4 +1,4 @@
-// user-logs.js - COM NOMES DOS SUPERMERCADOS
+// user-logs.js - COM NOMES DOS SUPERMERCADOS (tabela supermercado)
 
 let currentPage = 1;
 const logsPerPage = 10;
@@ -22,8 +22,8 @@ async function loadMarketMap() {
         console.log('Carregando mapeamento de mercados...');
         
         const { data, error } = await supabase
-            .from('markets') // Nome da tabela de mercados (ajuste se necessário)
-            .select('cnpj, name'); // Supondo que tenha cnpj e name
+            .from('supermercados') // Nome da tabela: supermercados
+            .select('cnpj, nome'); // Colunas: cnpj e nome
 
         if (error) {
             console.error('Erro ao carregar mercados:', error);
@@ -33,7 +33,7 @@ async function loadMarketMap() {
         // Cria o mapa CNPJ -> Nome
         marketMap = {};
         data.forEach(market => {
-            marketMap[market.cnpj] = market.name;
+            marketMap[market.cnpj] = market.nome;
         });
 
         console.log('Mapeamento de mercados carregado:', marketMap);
@@ -134,8 +134,6 @@ function renderLogsTable(logs) {
         tbody.appendChild(row);
     });
 }
-
-// ... (o restante das funções permanece igual) ...
 
 function formatDateTime(dateString) {
     if (!dateString) return 'N/A';
@@ -243,8 +241,6 @@ async function loadUsersForFilters() {
         console.error('Erro ao carregar usuários:', error);
     }
 }
-
-// ... (o restante das funções permanece igual) ...
 
 // Funções de filtro
 async function applyFilters() {
