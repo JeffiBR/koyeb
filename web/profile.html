@@ -2,7 +2,8 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Meu Perfil</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Perfil - Sistema de Preços</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -10,7 +11,299 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="auth.js"></script>
+    <script src="user-menu.js"></script>
     <script src="theme.js"></script>
+    <style>
+        .profile-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .form-section {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-section h3 {
+            margin: 0 0 1.5rem 0;
+            color: var(--text-primary);
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .form-section h3 i {
+            color: var(--primary);
+        }
+
+        .avatar-management {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 2.5rem;
+            align-items: start;
+        }
+
+        .current-avatar {
+            text-align: center;
+            padding: 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 2px dashed var(--border-color);
+        }
+
+        .current-avatar img {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .avatar-actions {
+            margin-top: 1rem;
+        }
+
+        .avatar-upload {
+            flex: 1;
+        }
+
+        .avatar-preview {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .avatar-preview span {
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .avatar-preview img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--primary);
+        }
+
+        .password-fields {
+            position: relative;
+        }
+
+        .form-group {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-group input:required {
+            border-left: 3px solid var(--primary);
+        }
+
+        .btn-password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 42px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-password-toggle:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .form-actions {
+            margin-top: 2.5rem;
+            display: flex;
+            gap: 1rem;
+            flex-direction: column;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-outline:hover {
+            background: var(--bg-secondary);
+            border-color: var(--text-secondary);
+        }
+
+        .full-width {
+            width: 100%;
+        }
+
+        .status-message {
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin-top: 1.5rem;
+            text-align: center;
+            font-weight: 500;
+            border: 1px solid transparent;
+        }
+
+        .status-message.success {
+            background: rgba(34, 197, 94, 0.1);
+            color: rgb(34, 197, 94);
+            border-color: rgba(34, 197, 94, 0.2);
+        }
+
+        .status-message.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: rgb(239, 68, 68);
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+
+        .status-message.info {
+            background: rgba(59, 130, 246, 0.1);
+            color: rgb(59, 130, 246);
+            border-color: rgba(59, 130, 246, 0.2);
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 0.25rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .avatar-management {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+            
+            .current-avatar {
+                text-align: left;
+                display: flex;
+                align-items: center;
+                gap: 1.5rem;
+                padding: 1rem;
+            }
+            
+            .current-avatar img {
+                width: 80px;
+                height: 80px;
+                margin-bottom: 0;
+            }
+
+            .form-section {
+                padding: 1.5rem;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .btn-primary, .btn-outline {
+                padding: 0.875rem 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .current-avatar {
+                flex-direction: column;
+                text-align: center;
+                gap: 1rem;
+            }
+
+            .avatar-actions {
+                width: 100%;
+            }
+
+            .btn-outline {
+                width: 100%;
+            }
+        }
+
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body class="theme-dark">
     <script>routeGuard();</script>
@@ -29,15 +322,16 @@
                     <li data-permission="dashboard"><a href="/dashboard.html"><i class="fas fa-chart-line"></i> Dashboard</a></li>
                     
                     <li class="nav-header">ADMINISTRAÇÃO</li>
-                    <li data-permission="coleta"><a href="/admin.html" class="active"><i class="fas fa-database"></i> Coleta</a></li>
+                    <li data-permission="coleta"><a href="/admin.html"><i class="fas fa-database"></i> Coleta</a></li>
                     <li data-permission="collections"><a href="/collections.html"><i class="fas fa-history"></i> Histórico de Coletas</a></li>
                     <li data-permission="product_log"><a href="/product-log.html"><i class="fas fa-file-alt"></i> Log de Produtos</a></li>
-                   <li data-permission="user_logs"><a href="/user-logs.html"><i class="fas fa-user-clock"></i> Logs de Usuários</a></li>
+                    <li data-permission="user_logs"><a href="/user-logs.html"><i class="fas fa-user-clock"></i> Logs de Usuários</a></li>
                     <li data-permission="prune"><a href="/prune.html"><i class="fas fa-broom"></i> Limpeza de Dados</a></li>
 
                     <li class="nav-header">CONFIGURAÇÃO</li>
                     <li data-permission="markets"><a href="/markets.html"><i class="fas fa-store"></i> Gerenciar Mercados</a></li>
                     <li data-permission="users"><a href="/users.html"><i class="fas fa-users"></i> Gerenciar Usuários</a></li>
+                    <li><a href="/profile.html" class="active"><i class="fas fa-user"></i> Meu Perfil</a></li>
                 </ul>
             </nav>
             <div class="theme-switcher">
@@ -90,33 +384,139 @@
                         <i class="fas fa-user"></i>
                         <h2>Meu Perfil</h2>
                     </div>
-                    <p class="panel-description">Gerencie suas informações pessoais e preferências.</p>
+                    <p class="panel-description">Gerencie suas informações pessoais, credenciais e preferências.</p>
                     
-                    <div class="form-container">
-                        <div class="form-group">
-                            <label for="fullName">Nome Completo</label>
-                            <input type="text" id="fullName">
+                    <div class="profile-container">
+                        <!-- Seção de Informações Pessoais -->
+                        <div class="form-section">
+                            <h3><i class="fas fa-id-card"></i> Informações Pessoais</h3>
+                            <div class="form-container">
+                                <div class="form-group">
+                                    <label for="fullName">Nome Completo *</label>
+                                    <input type="text" id="fullName" required placeholder="Digite seu nome completo">
+                                </div>
+                                <div class="form-group">
+                                    <label for="jobTitle">Cargo / Função</label>
+                                    <input type="text" id="jobTitle" placeholder="Ex: Analista de Preços, Gerente Comercial">
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="jobTitle">Cargo / Função</label>
-                            <input type="text" id="jobTitle" placeholder="Ex: Analista de Preços">
+
+                        <!-- Seção de Foto de Perfil -->
+                        <div class="form-section">
+                            <h3><i class="fas fa-camera"></i> Foto de Perfil</h3>
+                            <div class="avatar-management">
+                                <div class="current-avatar">
+                                    <img src="https://ui-avatars.com/api/?name=U" alt="Avatar atual" id="currentAvatar">
+                                    <div class="avatar-actions">
+                                        <button type="button" id="removeAvatarBtn" class="btn-outline full-width">
+                                            <i class="fas fa-trash"></i> Remover Foto
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="avatar-upload">
+                                    <div class="form-group">
+                                        <label for="avatarFile">Alterar Foto de Perfil</label>
+                                        <input type="file" id="avatarFile" accept="image/jpeg,image/png,image/gif">
+                                        <small>Formatos suportados: JPG, PNG, GIF (Máx. 1MB)</small>
+                                    </div>
+                                    <div id="avatarPreview" class="avatar-preview" style="display: none;">
+                                        <span>Pré-visualização:</span>
+                                        <img id="previewImage" alt="Pré-visualização da nova foto">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="avatarFile">Alterar Foto de Perfil (max 1MB)</label>
-                            <input type="file" id="avatarFile" accept="image/*">
+
+                        <!-- Seção de Credenciais -->
+                        <div class="form-section">
+                            <h3><i class="fas fa-lock"></i> Segurança e Credenciais</h3>
+                            <div class="form-container">
+                                <div class="form-group">
+                                    <label for="email">E-mail *</label>
+                                    <input type="email" id="email" required placeholder="seu.email@exemplo.com">
+                                </div>
+                                <div class="password-fields">
+                                    <div class="form-group">
+                                        <label for="currentPassword">Senha Atual</label>
+                                        <input type="password" id="currentPassword" placeholder="Digite sua senha atual para alterações">
+                                        <button type="button" id="toggleCurrentPassword" class="btn-password-toggle">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <small>Necessária apenas para alterar e-mail ou senha</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="newPassword">Nova Senha</label>
+                                        <input type="password" id="newPassword" placeholder="Mínimo 6 caracteres">
+                                        <button type="button" id="toggleNewPassword" class="btn-password-toggle">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <small>Deixe em branco para manter a senha atual</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="confirmPassword">Confirmar Nova Senha</label>
+                                        <input type="password" id="confirmPassword" placeholder="Repita a nova senha">
+                                        <button type="button" id="toggleConfirmPassword" class="btn-password-toggle">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <button id="updateProfileBtn" class="btn full-width">
-                            <i class="fas fa-save"></i> Salvar Alterações
-                        </button>
-                        <div id="uploadStatus"></div>
+
+                        <!-- Botões de Ação -->
+                        <div class="form-actions">
+                            <button id="updateProfileBtn" class="btn-primary full-width">
+                                <i class="fas fa-save"></i> Salvar Todas as Alterações
+                            </button>
+                            <button id="discardChangesBtn" class="btn-outline full-width" style="display: none;">
+                                <i class="fas fa-times"></i> Descartar Alterações
+                            </button>
+                        </div>
+
+                        <div id="uploadStatus" class="status-message"></div>
                     </div>
                 </main>
             </div>
         </div>
     </div>
+
     <script src="mobile-menu.js"></script>
     <script src="user-menu.js"></script>
-     <script src="user-activity-monitor.js"></script>
+    <script src="user-activity-monitor.js"></script>
+    <script>
+        // Inicialização do tema
+        document.addEventListener('DOMContentLoaded', function() {
+            const themeToggle = document.getElementById('themeToggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    const isDark = document.body.classList.contains('theme-dark');
+                    document.body.classList.toggle('theme-dark', !isDark);
+                    document.body.classList.toggle('theme-light', isDark);
+                    
+                    const icon = this.querySelector('i');
+                    if (isDark) {
+                        icon.className = 'fas fa-sun';
+                    } else {
+                        icon.className = 'fas fa-moon';
+                    }
+                    
+                    // Salvar preferência
+                    localStorage.setItem('theme', isDark ? 'light' : 'dark');
+                });
+            }
+
+            // Carregar tema salvo
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.body.classList.toggle('theme-dark', savedTheme === 'dark');
+            document.body.classList.toggle('theme-light', savedTheme === 'light');
+            
+            const themeIcon = document.getElementById('themeToggle')?.querySelector('i');
+            if (themeIcon) {
+                themeIcon.className = savedTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+            }
+        });
+    </script>
     <script src="profile.js"></script>
 </body>
 </html>
