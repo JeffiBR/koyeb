@@ -190,16 +190,21 @@ class UserUpdate(BaseModel):
     allowed_pages: List[str]
 
 class ProfileUpdateWithCredentials(BaseModel):
-    full_name: str
-    job_title: str
+    # Campos que o usuário PODE alterar (tornados opcionais para flexibilidade)
+    full_name: Optional[str] = None
+    job_title: Optional[str] = None
     avatar_url: Optional[str] = None
     email: Optional[str] = None
+    
+    # Campos para alteração de senha (já são opcionais)
     current_password: Optional[str] = None
     new_password: Optional[str] = None
 
     class Config:
-        extra = "forbid"
-
+        # Ignora campos extras (como 'role' ou 'allowed_pages') que possam ser enviados
+        # pelo frontend, evitando erros de validação.
+        extra = "ignore"
+        
 class Supermercado(BaseModel):
     id: Optional[int] = None
     nome: str
@@ -974,3 +979,4 @@ app.mount("/", StaticFiles(directory="web", html=True), name="static")
 @app.get("/")
 def read_root():
     return {"message": "Bem-vindo à API de Preços AL - Versão 3.1.2"}
+
