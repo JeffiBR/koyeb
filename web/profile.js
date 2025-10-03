@@ -1,4 +1,4 @@
-// profile.js - COMPLETO e ajustado para sempre usar /api/users/me
+// profile.js - COMPLETO
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- ELEMENTOS DA UI ---
@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const emailInput = document.getElementById('email');
     const currentPasswordInput = document.getElementById('currentPassword');
     const newPasswordInput = document.getElementById('newPassword');
-    const confirmPasswordInput = document.getElementById('confirmPassword');
+    const confirmPasswordInput = documentgetElementById('confirmPassword');
     const avatarFileInput = document.getElementById('avatarFile');
     const currentAvatar = document.getElementById('currentAvatar');
     const removeAvatarBtn = document.getElementById('removeAvatarBtn');
@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const setupPasswordToggles = () => {
         const setupToggle = (toggleBtn, input) => {
+            if (!toggleBtn || !input) return;
             toggleBtn.addEventListener('click', () => {
                 const type = input.type === 'password' ? 'text' : 'password';
                 input.type = type;
@@ -54,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             const userName = fullNameInput.value || 'Usuário';
             const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=random&color=fff&bold=true`;
+            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials )}&background=random&color=fff&bold=true`;
             currentAvatar.src = defaultAvatar;
             if (userAvatar) userAvatar.src = defaultAvatar;
         }
@@ -192,7 +193,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- Atualização do Perfil (ajustado) ---
     const handleProfileUpdate = async () => {
         try {
             validateForm();
@@ -202,22 +202,35 @@ document.addEventListener('DOMContentLoaded', () => {
             showStatus('Salvando alterações...', 'info');
 
             let avatarUrl = currentUserProfile?.avatar_url;
-            if (avatarFileInput.files[0]) avatarUrl = await handleAvatarUpload();
-            if (removeAvatarBtn.disabled === false && !avatarFileInput.files[0]) avatarUrl = await removeCurrentAvatar();
+            if (avatarFileInput.files[0]) {
+                avatarUrl = await handleAvatarUpload();
+            } else if (removeAvatarBtn.disabled === false && !avatarFileInput.files[0]) {
+                avatarUrl = await removeCurrentAvatar();
+            }
 
-            const updateData = {
-                full_name: fullNameInput.value.trim(),
-                job_title: jobTitleInput.value.trim()
-            };
-
-            if (avatarUrl !== undefined) updateData.avatar_url = avatarUrl;
-            if (emailInput.value !== currentUserProfile.email) updateData.email = emailInput.value;
+            const updateData = {};
+            if (fullNameInput.value.trim() !== originalProfileData.full_name) {
+                updateData.full_name = fullNameInput.value.trim();
+            }
+            if (jobTitleInput.value.trim() !== (originalProfileData.job_title || '')) {
+                updateData.job_title = jobTitleInput.value.trim();
+            }
+            if (avatarUrl !== currentUserProfile.avatar_url) {
+                updateData.avatar_url = avatarUrl;
+            }
+            if (emailInput.value !== currentUserProfile.email) {
+                updateData.email = emailInput.value;
+            }
             if (newPasswordInput.value) {
                 updateData.new_password = newPasswordInput.value;
                 updateData.current_password = currentPasswordInput.value;
             }
 
-            // 🔥 Forçar sempre /api/users/me
+            if (Object.keys(updateData).length === 0) {
+                showStatus('Nenhuma alteração para salvar.', 'info');
+                return;
+            }
+
             const response = await authenticatedFetch('/api/users/me', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -233,12 +246,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const updatedProfile = await response.json();
             showStatus('Perfil atualizado com sucesso!', 'success');
 
-            updateAvatarDisplay(avatarUrl);
             currentUserProfile = { ...currentUserProfile, ...updatedProfile };
             originalProfileData = { ...currentUserProfile };
-
+            
+            updateAvatarDisplay(currentUserProfile.avatar_url);
             avatarFileInput.value = '';
             avatarPreview.style.display = 'none';
+            currentPasswordInput.value = '';
+            newPasswordInput.value = '';
+            confirmPasswordInput.value = '';
+            checkForChanges();
 
         } catch (error) {
             console.error('Erro ao atualizar perfil:', error);
@@ -252,9 +269,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             showStatus(`Erro: ${displayMessage}`, 'error');
         } finally {
-            updateProfileBtn.disabled = false;
+            updateProfileBtn.disabled = !hasUnsavedChanges;
             updateProfileBtn.innerHTML = '<i class="fas fa-save"></i><span>Salvar Todas as Alterações</span>';
-            checkForChanges();
         }
     };
 
