@@ -1,4 +1,4 @@
-// user-menu.js - COMPLETO E FINAL
+// user-menu.js - VERSÃO FINAL
 
 document.addEventListener('DOMContentLoaded', function() {
     class UserMenu {
@@ -14,7 +14,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         async init() {
-            console.log('🔧 Inicializando UserMenu...');
             await this.loadUserInfo();
             this.setupEventListeners();
         }
@@ -22,189 +21,91 @@ document.addEventListener('DOMContentLoaded', function() {
         async loadUserInfo() {
             try {
                 this.showLoadingState();
-                console.log('📡 Buscando dados do usuário...');
                 
-                const userData = await this.fetchRealUserData();
+                // A função fetchUserProfile do auth.js já tem cache, então é seguro chamá-la.
+                // Após uma atualização, o cache terá sido limpo.
+                const userData = await fetchUserProfile();
                 
                 if (userData) {
                     this.updateUI(userData);
-                    console.log('✅ Dados reais carregados:', userData);
                 } else {
-                    console.log('❌ Nenhum dado de usuário encontrado');
                     this.handleNoUserData();
                 }
                 
             } catch (error) {
-                console.error('❌ Erro ao carregar informações:', error);
+                console.error('❌ Erro ao carregar informações do usuário:', error);
                 this.showErrorState();
             }
         }
 
-        async fetchRealUserData() {
-            try {
-                console.log('🌐 Buscando dados reais do usuário...');
-                
-                if (typeof fetchUserProfile === 'function') {
-                    console.log('📚 Usando fetchUserProfile do auth.js');
-                    const profile = await fetchUserProfile();
-                    if (profile) {
-                        return {
-                            name: profile.full_name,
-                            email: profile.email,
-                            role: profile.role,
-                            avatar: profile.avatar_url,
-                            permissions: profile.allowed_pages || []
-                        };
-                    }
-                }
-                
-                console.log('🔧 Fazendo requisição direta para /api/users/me');
-                const response = await authenticatedFetch('/api/users/me');
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const profile = await response.json();
-                return {
-                    name: profile.full_name,
-                    email: profile.email,
-                    role: profile.role,
-                    avatar: profile.avatar_url,
-                    permissions: profile.allowed_pages || []
-                };
-                
-            } catch (error) {
-                console.error('❌ Erro ao buscar dados reais:', error);
-                return null;
-            }
-        }
-
         updateUI(userData) {
-            console.log('🎨 Atualizando UI com dados reais:', userData);
-            
             if (this.userName) {
-                this.userName.textContent = userData.name || userData.email || 'Usuário';
-                console.log('✏️ Nome definido como:', this.userName.textContent);
+                this.userName.textContent = userData.full_name || userData.email || 'Usuário';
             }
 
             if (this.userRole) {
-                const roleText = this.getRoleDisplayText(userData.role);
-                this.userRole.textContent = roleText;
-                console.log('🎯 Nível definido como:', roleText);
+                const roleMap = { 'admin': 'Administrador', 'user': 'Usuário' };
+                this.userRole.textContent = roleMap[userData.role] || 'Usuário';
             }
 
             if (this.userAvatar) {
-                if (userData.avatar) {
-                    // Adiciona um timestamp para evitar problemas de cache do navegador
-                    this.userAvatar.src = `${userData.avatar}?t=${new Date().getTime()}`;
-                    this.userAvatar.onerror = () => this.setDefaultAvatar(userData);
+                const timestamp = `?t=${new Date().getTime()}`;
+                if (userData.avatar_url) {
+                    this.userAvatar.src = userData.avatar_url + timestamp;
                 } else {
-                    this.setDefaultAvatar(userData);
+                    const name = userData.full_name || userData.email || 'U';
+                    this.userAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name )}&background=4f46e5&color=fff&bold=true`;
                 }
-                this.userAvatar.alt = `Avatar de ${userData.name || 'Usuário'}`;
-                console.log('🖼️ Avatar definido');
             }
-
-            localStorage.setItem('currentUser', JSON.stringify(userData));
             this.hideLoadingState();
-            console.log('✅ UI atualizada com dados reais');
-        }
-
-        setDefaultAvatar(userData) {
-            const name = userData.name || userData.email || 'U';
-            const backgroundColor = userData.role === 'admin' ? 'ef4444' : '4f46e5';
-            this.userAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name )}&background=${backgroundColor}&color=fff&size=128&bold=true`;
-            console.log('🖼️ Avatar padrão gerado para:', name);
-        }
-
-        getRoleDisplayText(role) {
-            const roleMap = {'admin': 'Administrador', 'user': 'Usuário'};
-            return roleMap[role] || 'Usuário';
         }
 
         setupEventListeners() {
-            console.log('🎮 Configurando event listeners...');
-            
-            if (this.userMenuBtn && this.userDropdown) {
-                this.userMenuBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.toggleDropdown();
-                });
+            if (this.userMenuBtn) {
+                this.userMenuBtn.addEventListener('click', () => this.userDropdown.classList.toggle('active'));
                 document.addEventListener('click', (e) => {
-                    if (!this.userMenuBtn.contains(e.target) && !this.userDropdown.contains(e.target)) {
-                        this.closeDropdown();
-                    }
+                    if (!this.userMenuBtn.contains(e.target)) this.userDropdown.classList.remove('active');
                 });
-                console.log('✅ Dropdown configurado');
             }
 
             if (this.logoutBtn) {
-                this.logoutBtn.addEventListener('click', (e) => {
+                this.logoutBtn.addEventListener('click', async (e) => {
                     e.preventDefault();
-                    this.handleLogout();
+                    if (confirm('Tem certeza que deseja sair?')) await signOut();
                 });
-                console.log('✅ Logout configurado');
             }
 
             // ==================================================================
             // --- OUVE O EVENTO DE ATUALIZAÇÃO DE PERFIL ---
             console.log('👂 Configurando ouvinte para o evento [profileUpdated].');
-            window.addEventListener('profileUpdated', (event) => {
-                console.log('🎉 Evento [profileUpdated] recebido!', event.detail);
-                // Simplesmente recarrega as informações do usuário do zero
-                // para garantir que todos os dados (nome, foto, etc.) sejam atualizados.
+            window.addEventListener('profileUpdated', () => {
+                console.log('🎉 Evento [profileUpdated] recebido! Recarregando informações do menu.');
                 this.loadUserInfo(); 
             });
             // ==================================================================
-            
-            console.log('🎯 Todos os event listeners configurados');
-        }
-
-        toggleDropdown() {
-            this.userDropdown.classList.toggle('active');
-        }
-
-        closeDropdown() {
-            this.userDropdown.classList.remove('active');
-        }
-
-        async handleLogout() {
-            if (confirm('Tem certeza que deseja sair?')) {
-                if (typeof signOut === 'function') {
-                    await signOut();
-                }
-            }
         }
 
         showLoadingState() {
             if (this.userName) this.userName.textContent = 'Carregando...';
             if (this.userRole) this.userRole.textContent = '...';
-            console.log('⏳ Mostrando estado de loading');
         }
 
         hideLoadingState() {
-            console.log('✅ Loading finalizado');
+            // A UI é atualizada diretamente, não há estado de "loading" para remover.
         }
 
         showErrorState() {
-            if (this.userName) this.userName.textContent = 'Erro ao carregar';
+            if (this.userName) this.userName.textContent = 'Erro';
             if (this.userRole) this.userRole.textContent = '---';
-            this.setDefaultAvatar({ name: 'Erro', role: 'user' });
-            console.log('❌ Estado de erro mostrado');
         }
 
         handleNoUserData() {
-            if (this.userName) this.userName.textContent = 'Usuário Não Logado';
-            if (this.userRole) this.userRole.textContent = '---';
-            setTimeout(() => { window.location.href = '/login.html'; }, 1000);
+            // Se não houver dados, o routeGuard no auth.js já deve ter redirecionado para o login.
+            console.log('Nenhum dado de usuário, redirecionamento para login deve ocorrer.');
         }
     }
 
     if (document.getElementById('userMenuBtn')) {
-        console.log('🚀 Iniciando UserMenu...');
         new UserMenu();
-    } else {
-        console.log('⏭️ UserMenu não inicializado - elementos não encontrados');
     }
 });
