@@ -1,17 +1,77 @@
-// user-logs.js - CÓDIGO CORRIGIDO COM OS CAMPOS EXATOS
+// user-logs.js - COM NOMES DOS SUPERMERCADOS
 
 let currentPage = 1;
 const logsPerPage = 10;
 let allLogs = [];
+let marketMap = {}; // Mapa para armazenar CNPJ -> Nome
 
 document.addEventListener('DOMContentLoaded', function() {
     initializePage();
 });
 
 async function initializePage() {
+    await loadMarketMap(); // Carrega o mapeamento CNPJ -> Nome
     await loadUsersForFilters();
     await loadUserLogs();
     setupEventListeners();
+}
+
+// Função para carregar o mapeamento de CNPJ para nome dos mercados
+async function loadMarketMap() {
+    try {
+        console.log('Carregando mapeamento de mercados...');
+        
+        const { data, error } = await supabase
+            .from('markets') // Nome da tabela de mercados (ajuste se necessário)
+            .select('cnpj, name'); // Supondo que tenha cnpj e name
+
+        if (error) {
+            console.error('Erro ao carregar mercados:', error);
+            return;
+        }
+
+        // Cria o mapa CNPJ -> Nome
+        marketMap = {};
+        data.forEach(market => {
+            marketMap[market.cnpj] = market.name;
+        });
+
+        console.log('Mapeamento de mercados carregado:', marketMap);
+        
+    } catch (error) {
+        console.error('Erro ao carregar mapeamento de mercados:', error);
+    }
+}
+
+// Função para converter CNPJs em nomes de mercados
+function getMarketNames(marketData) {
+    if (!marketData) return '-';
+    
+    try {
+        // Se for string, tenta converter para array
+        let marketArray;
+        if (typeof marketData === 'string') {
+            // Remove espaços e quebras de linha, depois divide por vírgulas
+            marketArray = marketData.replace(/\s+/g, '').split(',');
+        } else if (Array.isArray(marketData)) {
+            marketArray = marketData;
+        } else {
+            return '-';
+        }
+
+        // Converte cada CNPJ para o nome do mercado
+        const marketNames = marketArray.map(cnpj => {
+            // Remove qualquer caractere não numérico do CNPJ
+            const cleanCnpj = cnpj.replace(/\D/g, '');
+            return marketMap[cleanCnpj] || cnpj; // Retorna nome se existir, senão o CNPJ
+        });
+
+        return marketNames.join(', ');
+        
+    } catch (error) {
+        console.error('Erro ao processar mercados:', error, marketData);
+        return marketData; // Retorna o original em caso de erro
+    }
 }
 
 async function loadUserLogs(page = 1) {
@@ -57,12 +117,12 @@ function renderLogsTable(logs) {
     logs.forEach(log => {
         const row = document.createElement('tr');
         
-        // USANDO OS CAMPOS EXATOS DA SUA TABELA
+        // USANDO OS CAMPOS EXATOS DA SUA TABELA E CONVERTENDO CNPJ PARA NOME
         row.innerHTML = `
             <td>${log.user_name || log.user_email || 'N/A'}</td>
             <td>${log.action_type || 'N/A'}</td>
             <td>${log.search_term || '-'}</td>
-            <td>${formatMarkets(log.selected_markets)}</td>
+            <td>${getMarketNames(log.selected_markets)}</td>
             <td>${log.result_count || '0'}</td>
             <td>${formatDateTime(log.created_at)}</td>
             <td>
@@ -75,13 +135,7 @@ function renderLogsTable(logs) {
     });
 }
 
-function formatMarkets(markets) {
-    if (!markets) return '-';
-    if (Array.isArray(markets)) {
-        return markets.join(', ');
-    }
-    return markets;
-}
+// ... (o restante das funções permanece igual) ...
 
 function formatDateTime(dateString) {
     if (!dateString) return 'N/A';
@@ -189,6 +243,8 @@ async function loadUsersForFilters() {
         console.error('Erro ao carregar usuários:', error);
     }
 }
+
+// ... (o restante das funções permanece igual) ...
 
 // Funções de filtro
 async function applyFilters() {
@@ -379,28 +435,9 @@ function convertToCSV(data) {
         `"${log.action_type || ''}"`,
         `"${log.page_accessed || ''}"`,
         `"${log.search_term || ''}"`,
-        `"${log.selected_markets || ''}"`,
+        `"${getMarketNames(log.selected_markets)}"`, // Usa a função para converter para nomes
         log.result_count || '0'
     ].join(','));
     
     return [csvHeaders, ...csvRows].join('\n');
 }
-
-// Teste de conexão - útil para debug
-async function testConnection() {
-    console.log('Testando conexão com Supabase...');
-    
-    const { data, error } = await supabase
-        .from('log_de_usuarios')
-        .select('*')
-        .limit(1);
-
-    if (error) {
-        console.error('❌ Erro na conexão:', error);
-    } else {
-        console.log('✅ Conexão OK. Estrutura do primeiro registro:', data[0]);
-    }
-}
-
-// Inicializar teste (opcional - remova em produção)
-// testConnection();
