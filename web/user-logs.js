@@ -1,477 +1,406 @@
-// user-logs.js (corrigido)
+// user-logs.js - CÓDIGO CORRIGIDO COM OS CAMPOS EXATOS
+
 let currentPage = 1;
-const pageSize = 20;
-let totalLogs = 0;
-let currentFilters = {};
+const logsPerPage = 10;
+let allLogs = [];
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Inicializando página de logs de usuários...');
     initializePage();
 });
 
 async function initializePage() {
-    await loadUsers();
-    await loadLogs();
+    await loadUsersForFilters();
+    await loadUserLogs();
     setupEventListeners();
-    await logPageAccess();
 }
 
-function setupEventListeners() {
-    document.getElementById('filterButton').addEventListener('click', applyFilters);
-    document.getElementById('clearFilters').addEventListener('click', clearFilters);
-    document.getElementById('exportButton').addEventListener('click', exportLogs);
-    
-    document.getElementById('deleteByDate').addEventListener('click', deleteLogsByDate);
-    document.getElementById('deleteByUser').addEventListener('click', deleteLogsByUser);
-    document.getElementById('deleteAll').addEventListener('click', deleteAllLogs);
-    
-    document.getElementById('prevPage').addEventListener('click', goToPreviousPage);
-    document.getElementById('nextPage').addEventListener('click', goToNextPage);
-}
-
-async function logPageAccess() {
+async function loadUserLogs(page = 1) {
     try {
-        await authenticatedFetch('/api/log-page-access', {
-            method: 'POST',
-            body: JSON.stringify({
-                page_key: 'user_logs'
-            })
-        });
-        console.log('✅ Acesso à página registrado');
+        showLoadingState();
+        
+        console.log('Carregando logs do Supabase...');
+        
+        const { data, error, count } = await supabase
+            .from('log_de_usuarios')
+            .select('*', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range((page - 1) * logsPerPage, page * logsPerPage - 1);
+
+        if (error) {
+            console.error('Erro ao carregar logs:', error);
+            showError('Erro ao carregar logs: ' + error.message);
+            return;
+        }
+
+        console.log('Logs carregados:', data);
+        
+        if (!data || data.length === 0) {
+            renderEmptyState();
+            updatePagination(0, page);
+            return;
+        }
+
+        allLogs = data;
+        renderLogsTable(data);
+        updatePagination(count, page);
+        
     } catch (error) {
-        console.error('❌ Erro ao registrar acesso:', error);
+        console.error('Erro inesperado:', error);
+        showError('Erro inesperado ao carregar logs');
     }
 }
 
-async function loadUsers() {
-    try {
-        const response = await authenticatedFetch('/api/users');
-        
-        if (response.ok) {
-            const users = await response.json();
-            const userFilter = document.getElementById('userFilter');
-            const bulkUser = document.getElementById('bulkUser');
-            
-            userFilter.innerHTML = '<option value="">Todos os Usuários</option>';
-            bulkUser.innerHTML = '<option value="">Selecionar usuário...</option>';
-            
-            users.forEach(user => {
-                const option = document.createElement('option');
-                option.value = user.id;
-                const displayName = user.full_name || user.email || `Usuário ${user.id.substring(0, 8)}`;
-                option.textContent = displayName;
-                userFilter.appendChild(option);
-                
-                const bulkOption = option.cloneNode(true);
-                bulkUser.appendChild(bulkOption);
-            });
-        } else {
-            throw new Error(`Erro ${response.status}: ${response.statusText}`);
-        }
-    } catch (error) {
-        console.error('Erro ao carregar usuários:', error);
-        showNotification('Erro ao carregar lista de usuários.', 'error');
-    }
-}
-
-async function loadLogs() {
+function renderLogsTable(logs) {
     const tbody = document.querySelector('#logsTable tbody');
-    tbody.innerHTML = '<tr><td colspan="7" class="loading-state">Carregando logs...</td></tr>';
+    tbody.innerHTML = '';
 
-    try {
-        const params = new URLSearchParams();
-        params.set('page', currentPage);
-        params.set('page_size', pageSize);
+    logs.forEach(log => {
+        const row = document.createElement('tr');
         
-        if (currentFilters.user_id) {
-            params.set('user_id', currentFilters.user_id);
-        }
-        if (currentFilters.action_type) {
-            params.set('action_type', currentFilters.action_type);
-        }
-        if (currentFilters.date) {
-            params.set('date', currentFilters.date);
-        }
-
-        const response = await authenticatedFetch(`/api/user-logs?${params.toString()}`);
-        console.log('Resposta da API:', response);
-
-        if (response.ok) {
-            const data = await response.json();
-            console.log('Dados recebidos:', data);
-            
-            totalLogs = data.total_count || 0;
-            displayLogs(data.data || []);
-            updatePaginationInfo();
-        } else {
-            const errorText = await response.text();
-            console.error('Erro na API:', errorText);
-            throw new Error(`Erro ${response.status}: ${response.statusText}`);
-        }
-    } catch (error) {
-        console.error('Erro ao carregar logs:', error);
-        displayError('Erro ao carregar os dados dos logs. Verifique o console para mais detalhes.');
-    }
-}
-
-function displayError(message) {
-    const tbody = document.querySelector('#logsTable tbody');
-    tbody.innerHTML = `<tr><td colspan="7" class="loading-state error-state">${message}</td></tr>`;
-}
-
-function displayLogs(logs) {
-    const tbody = document.querySelector('#logsTable tbody');
-    
-    if (!logs || logs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="loading-state">Nenhum log encontrado.</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = logs.map(log => {
-        const date = new Date(log.created_at);
-        const formattedDate = date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR');
-        
-        let marketsDisplay = 'N/A';
-        if (Array.isArray(log.selected_markets) && log.selected_markets.length > 0) {
-            marketsDisplay = log.selected_markets.length > 3 
-                ? `${log.selected_markets.slice(0, 3).join(', ')} e mais ${log.selected_markets.length - 3}`
-                : log.selected_markets.join(', ');
-        }
-        
-        const userName = log.user_name || 'Usuário Desconhecido';
-        const userEmail = log.user_email || 'N/A';
-        const userInitial = userName ? userName.charAt(0).toUpperCase() : 'U';
-
-        let actionIcon = '';
-        let actionColor = '';
-        let actionText = '';
-
-        if (log.action_type === 'search') {
-            actionIcon = 'fas fa-search';
-            actionColor = 'var(--primary)';
-            actionText = 'Busca DB';
-        } else if (log.action_type === 'realtime_search') {
-            actionIcon = 'fas fa-rocket';
-            actionColor = 'var(--accent)';
-            actionText = 'Busca Real-Time';
-        } else if (log.action_type === 'access') {
-            actionIcon = 'fas fa-sign-in-alt';
-            actionColor = 'var(--green)';
-            actionText = log.page_accessed || 'Acesso Página';
-        } else {
-            actionIcon = 'fas fa-info-circle';
-            actionColor = 'var(--muted-dark)';
-            actionText = log.action_type || 'Outra Ação';
-        }
-        
-        return `
-            <tr>
-                <td>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--accent)); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 0.8rem;">
-                            ${userInitial}
-                        </div>
-                        <div>
-                            <div style="font-weight: 600;">${userName}</div>
-                            <div style="font-size: 0.8rem; color: var(--muted-dark);">${userEmail}</div>
-                        </div>
-                    </div>
-                </td>
-                <td>
-                    <span class="badge" style="background-color: ${actionColor};">
-                        <i class="${actionIcon}"></i> ${actionText}
-                    </span>
-                </td>
-                <td>${log.search_term || 'N/A'}</td>
-                <td>${marketsDisplay}</td>
-                <td>${log.result_count !== undefined && log.result_count !== null ? log.result_count : 'N/A'}</td>
-                <td>${formattedDate}</td>
-                <td>
-                    <button class="btn icon-only danger delete-log-btn" data-log-id="${log.id}" title="Deletar Log">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
+        // USANDO OS CAMPOS EXATOS DA SUA TABELA
+        row.innerHTML = `
+            <td>${log.user_name || log.user_email || 'N/A'}</td>
+            <td>${log.action_type || 'N/A'}</td>
+            <td>${log.search_term || '-'}</td>
+            <td>${formatMarkets(log.selected_markets)}</td>
+            <td>${log.result_count || '0'}</td>
+            <td>${formatDateTime(log.created_at)}</td>
+            <td>
+                <button class="btn danger btn-sm" onclick="deleteLog('${log.id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
         `;
-    }).join('');
-    
-    document.querySelectorAll('.delete-log-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const logId = this.getAttribute('data-log-id');
-            deleteSingleLog(logId);
-        });
+        tbody.appendChild(row);
     });
 }
 
-async function deleteSingleLog(logId) {
-    if (!confirm('Tem certeza que deseja deletar este log?')) return;
+function formatMarkets(markets) {
+    if (!markets) return '-';
+    if (Array.isArray(markets)) {
+        return markets.join(', ');
+    }
+    return markets;
+}
 
-    try {
-        const response = await authenticatedFetch(`/api/user-logs/${logId}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            showNotification(`Log deletado com sucesso! (${result.deleted_count} excluído)`, 'success');
-            loadLogs();
-        } else {
-            throw new Error('Erro ao deletar log individual');
+function formatDateTime(dateString) {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleString('pt-BR');
+}
+
+function renderEmptyState() {
+    const tbody = document.querySelector('#logsTable tbody');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="7" style="text-align: center; padding: 2rem;">
+                <i class="fas fa-inbox" style="font-size: 3rem; color: var(--muted-dark); margin-bottom: 1rem;"></i>
+                <p>Nenhum log encontrado.</p>
+            </td>
+        </tr>
+    `;
+}
+
+function showError(message) {
+    const tbody = document.querySelector('#logsTable tbody');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="7" style="text-align: center; color: var(--danger); padding: 2rem;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>${message}</p>
+                <button class="btn outline btn-sm" onclick="loadUserLogs()">Tentar Novamente</button>
+            </td>
+        </tr>
+    `;
+}
+
+function showLoadingState() {
+    const tbody = document.querySelector('#logsTable tbody');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="7" style="text-align: center; padding: 2rem;">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Carregando logs...</p>
+            </td>
+        </tr>
+    `;
+}
+
+function updatePagination(totalCount, currentPage) {
+    const totalPages = Math.ceil(totalCount / logsPerPage);
+    const pageInfo = document.getElementById('pageInfo');
+    const prevBtn = document.getElementById('prevPage');
+    const nextBtn = document.getElementById('nextPage');
+
+    pageInfo.textContent = `Página ${currentPage} de ${totalPages || 1}`;
+    
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages;
+}
+
+function setupEventListeners() {
+    // Paginação
+    document.getElementById('prevPage').addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            loadUserLogs(currentPage);
         }
-    } catch (error) {
-        console.error('Erro ao deletar log individual:', error);
-        showNotification('Erro ao deletar log individual.', 'error');
-    }
-}
+    });
 
-function updatePaginationInfo() {
-    const totalPages = Math.ceil(totalLogs / pageSize);
-    document.getElementById('pageInfo').textContent = `Página ${currentPage} de ${totalPages}`;
-    document.getElementById('prevPage').disabled = currentPage === 1;
-    document.getElementById('nextPage').disabled = currentPage >= totalPages || totalPages === 0;
-}
-
-function goToPreviousPage() {
-    if (currentPage > 1) {
-        currentPage--;
-        loadLogs();
-    }
-}
-
-function goToNextPage() {
-    const totalPages = Math.ceil(totalLogs / pageSize);
-    if (currentPage < totalPages) {
+    document.getElementById('nextPage').addEventListener('click', () => {
         currentPage++;
-        loadLogs();
+        loadUserLogs(currentPage);
+    });
+
+    // Filtros
+    document.getElementById('filterButton').addEventListener('click', applyFilters);
+    document.getElementById('clearFilters').addEventListener('click', clearFilters);
+    
+    // Ações em lote
+    document.getElementById('deleteByDate').addEventListener('click', deleteLogsByDate);
+    document.getElementById('deleteByUser').addEventListener('click', deleteLogsByUser);
+    document.getElementById('deleteAll').addEventListener('click', deleteAllLogs);
+    document.getElementById('exportButton').addEventListener('click', exportLogs);
+}
+
+async function loadUsersForFilters() {
+    try {
+        // Carrega usuários únicos para os filtros
+        const { data, error } = await supabase
+            .from('log_de_usuarios')
+            .select('user_name, user_email')
+            .not('user_name', 'is', null);
+
+        if (error) throw error;
+
+        const userFilter = document.getElementById('userFilter');
+        const bulkUser = document.getElementById('bulkUser');
+
+        // Adiciona opções de usuário
+        const users = [...new Set(data.map(item => item.user_name).filter(Boolean))];
+        
+        users.forEach(user => {
+            const option = `<option value="${user}">${user}</option>`;
+            userFilter.innerHTML += option;
+            bulkUser.innerHTML += option;
+        });
+
+    } catch (error) {
+        console.error('Erro ao carregar usuários:', error);
     }
 }
 
-function applyFilters() {
-    const userFilter = document.getElementById('userFilter').value;
-    const actionFilter = document.getElementById('actionFilter').value;
-    const dateFilter = document.getElementById('dateFilter').value;
-    
-    currentFilters = {};
-    if (userFilter) currentFilters.user_id = userFilter;
-    if (actionFilter) currentFilters.action_type = actionFilter;
-    if (dateFilter) currentFilters.date = dateFilter;
-    
-    currentPage = 1;
-    loadLogs();
+// Funções de filtro
+async function applyFilters() {
+    try {
+        const userFilter = document.getElementById('userFilter').value;
+        const dateFilter = document.getElementById('dateFilter').value;
+        const actionFilter = document.getElementById('actionFilter').value;
+
+        let query = supabase
+            .from('log_de_usuarios')
+            .select('*', { count: 'exact' })
+            .order('created_at', { ascending: false });
+
+        // Aplicar filtros
+        if (userFilter) {
+            query = query.eq('user_name', userFilter);
+        }
+        if (dateFilter) {
+            const startDate = new Date(dateFilter);
+            const endDate = new Date(dateFilter);
+            endDate.setDate(endDate.getDate() + 1);
+            
+            query = query.gte('created_at', startDate.toISOString())
+                        .lt('created_at', endDate.toISOString());
+        }
+        if (actionFilter) {
+            query = query.eq('action_type', actionFilter);
+        }
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+
+        currentPage = 1;
+        allLogs = data || [];
+        renderLogsTable(allLogs);
+        updatePagination(count, currentPage);
+
+    } catch (error) {
+        console.error('Erro ao aplicar filtros:', error);
+        showError('Erro ao aplicar filtros');
+    }
 }
 
 function clearFilters() {
     document.getElementById('userFilter').value = '';
-    document.getElementById('actionFilter').value = '';
     document.getElementById('dateFilter').value = '';
-    currentFilters = {};
-    currentPage = 1;
-    loadLogs();
+    document.getElementById('actionFilter').value = '';
+    loadUserLogs(1);
+}
+
+// Funções de exclusão
+async function deleteLog(logId) {
+    if (!confirm('Tem certeza que deseja excluir este log?')) return;
+
+    try {
+        const { error } = await supabase
+            .from('log_de_usuarios')
+            .delete()
+            .eq('id', logId);
+
+        if (error) throw error;
+
+        // Recarregar a lista
+        loadUserLogs(currentPage);
+    } catch (error) {
+        console.error('Erro ao excluir log:', error);
+        alert('Erro ao excluir log: ' + error.message);
+    }
 }
 
 async function deleteLogsByDate() {
-    const dateToDelete = prompt('Digite a data (YYYY-MM-DD) para deletar todos os logs *anteriores ou iguais* a esta data:');
-    if (!dateToDelete) return;
-    
-    if (!confirm(`Tem certeza que deseja DELETAR TODOS OS LOGS até ${dateToDelete}? Esta ação é irreversível!`)) return;
+    const date = document.getElementById('bulkDate').value;
+    if (!date) {
+        alert('Selecione uma data para excluir os logs.');
+        return;
+    }
+
+    if (!confirm(`Tem certeza que deseja excluir TODOS os logs da data ${date}? Esta ação não pode ser desfeita.`)) return;
 
     try {
-        const response = await authenticatedFetch('/api/user-logs/delete-by-date', {
-            method: 'POST',
-            body: JSON.stringify({ date: dateToDelete })
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            showNotification(result.message || 'Logs deletados com sucesso!', 'success');
-            loadLogs();
-        } else {
-            throw new Error('Erro ao deletar logs por data.');
-        }
+        const startDate = new Date(date);
+        const endDate = new Date(date);
+        endDate.setDate(endDate.getDate() + 1);
+
+        const { error } = await supabase
+            .from('log_de_usuarios')
+            .delete()
+            .gte('created_at', startDate.toISOString())
+            .lt('created_at', endDate.toISOString());
+
+        if (error) throw error;
+
+        alert('Logs excluídos com sucesso!');
+        loadUserLogs(1);
     } catch (error) {
-        console.error('Erro ao deletar logs por data:', error);
-        showNotification('Erro ao deletar logs por data.', 'error');
+        console.error('Erro ao excluir logs por data:', error);
+        alert('Erro ao excluir logs: ' + error.message);
     }
 }
 
 async function deleteLogsByUser() {
-    const userId = document.getElementById('bulkUser').value;
-    if (!userId) {
-        showNotification('Selecione um usuário no campo "Excluir Logs por Usuário" primeiro.', 'warning');
+    const userName = document.getElementById('bulkUser').value;
+    if (!userName) {
+        alert('Selecione um usuário para excluir os logs.');
         return;
     }
-    
-    const userText = document.getElementById('bulkUser').options[document.getElementById('bulkUser').selectedIndex].text;
-    
-    if (!confirm(`Tem certeza que deseja DELETAR TODOS OS LOGS do usuário "${userText}"? Esta ação é irreversível!`)) return;
+
+    if (!confirm(`Tem certeza que deseja excluir TODOS os logs do usuário ${userName}? Esta ação não pode ser desfeita.`)) return;
 
     try {
-        const response = await authenticatedFetch(`/api/user-logs?user_id=${userId}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            showNotification(result.message || `Logs do usuário deletados com sucesso! (${result.deleted_count} excluídos)`, 'success');
-            loadLogs();
-        } else {
-            throw new Error('Erro ao deletar logs do usuário.');
-        }
+        const { error } = await supabase
+            .from('log_de_usuarios')
+            .delete()
+            .eq('user_name', userName);
+
+        if (error) throw error;
+
+        alert('Logs excluídos com sucesso!');
+        loadUserLogs(1);
     } catch (error) {
-        console.error('Erro ao deletar logs do usuário:', error);
-        showNotification('Erro ao deletar logs do usuário.', 'error');
+        console.error('Erro ao excluir logs por usuário:', error);
+        alert('Erro ao excluir logs: ' + error.message);
     }
 }
 
 async function deleteAllLogs() {
-    if (!confirm('Tem certeza que deseja DELETAR TODOS OS LOGS? Esta ação é irreversível e deletará todos os registros!')) return;
+    if (!confirm('Tem certeza que deseja excluir TODOS os logs? Esta ação não pode ser desfeita.')) return;
 
     try {
-        const response = await authenticatedFetch('/api/user-logs', {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            showNotification(result.message || 'Todos os logs foram deletados com sucesso!', 'success');
-            loadLogs();
-        } else {
-            throw new Error('Erro ao deletar todos os logs.');
-        }
+        const { error } = await supabase
+            .from('log_de_usuarios')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000'); // Exclui tudo
+
+        if (error) throw error;
+
+        alert('Todos os logs foram excluídos com sucesso!');
+        loadUserLogs(1);
     } catch (error) {
-        console.error('Erro ao deletar todos os logs:', error);
-        showNotification('Erro ao deletar todos os logs.', 'error');
+        console.error('Erro ao excluir todos os logs:', error);
+        alert('Erro ao excluir logs: ' + error.message);
     }
 }
 
 async function exportLogs() {
     try {
-        const params = new URLSearchParams();
-        
-        if (currentFilters.user_id) {
-            params.set('user_id', currentFilters.user_id);
-        }
-        if (currentFilters.action_type) {
-            params.set('action_type', currentFilters.action_type);
-        }
-        if (currentFilters.date) {
-            params.set('date', currentFilters.date);
-        }
+        const { data, error } = await supabase
+            .from('log_de_usuarios')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-        const response = await authenticatedFetch(`/api/user-logs/export?${params.toString()}`);
+        if (error) throw error;
+
+        // Converter para CSV
+        const csv = convertToCSV(data);
         
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `logs-usuarios-${new Date().toISOString().split('T')[0]}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            showNotification('Logs exportados com sucesso!', 'success');
-        } else {
-            throw new Error('Erro ao exportar logs');
-        }
+        // Criar e baixar arquivo
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', `logs_usuarios_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
     } catch (error) {
         console.error('Erro ao exportar logs:', error);
-        showNotification('Erro ao exportar logs', 'error');
+        alert('Erro ao exportar logs: ' + error.message);
     }
 }
 
-function showNotification(message, type = 'info') {
-    const existingNotification = document.querySelector('.notification');
-    if (existingNotification) {
-        existingNotification.remove();
-    }
+function convertToCSV(data) {
+    if (!data.length) return '';
     
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
+    const headers = ['ID', 'Data/Hora', 'Usuário', 'Email', 'Ação', 'Página Acessada', 'Termo Pesquisado', 'Mercados', 'Resultados'];
+    const csvHeaders = headers.join(',');
     
-    let icon = 'info-circle';
-    if (type === 'success') icon = 'check';
-    if (type === 'error') icon = 'exclamation-triangle';
-    if (type === 'warning') icon = 'exclamation';
+    const csvRows = data.map(log => [
+        log.id,
+        `"${formatDateTime(log.created_at)}"`,
+        `"${log.user_name || ''}"`,
+        `"${log.user_email || ''}"`,
+        `"${log.action_type || ''}"`,
+        `"${log.page_accessed || ''}"`,
+        `"${log.search_term || ''}"`,
+        `"${log.selected_markets || ''}"`,
+        log.result_count || '0'
+    ].join(','));
     
-    notification.innerHTML = `
-        <i class="fas fa-${icon}"></i>
-        <span>${message}</span>
-    `;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => notification.classList.add('show'), 100);
-    
-    setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.remove();
-            }
-        }, 300);
-    }, 5000);
+    return [csvHeaders, ...csvRows].join('\n');
 }
 
-// CSS para notificações
-const style = document.createElement('style');
-style.textContent = `
-    .loading-state {
-        text-align: center;
-        padding: 2rem;
-        color: var(--muted-dark);
-    }
+// Teste de conexão - útil para debug
+async function testConnection() {
+    console.log('Testando conexão com Supabase...');
     
-    .error-state {
-        color: var(--error);
-        background-color: rgba(239, 68, 68, 0.1);
+    const { data, error } = await supabase
+        .from('log_de_usuarios')
+        .select('*')
+        .limit(1);
+
+    if (error) {
+        console.error('❌ Erro na conexão:', error);
+    } else {
+        console.log('✅ Conexão OK. Estrutura do primeiro registro:', data[0]);
     }
-    
-    .notification {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 1rem 1.5rem;
-        border-radius: 8px;
-        color: white;
-        z-index: 1000;
-        transform: translateX(400px);
-        transition: transform 0.3s ease;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        max-width: 400px;
-    }
-    
-    .notification.show {
-        transform: translateX(0);
-    }
-    
-    .notification.success {
-        background-color: var(--success);
-    }
-    
-    .notification.error {
-        background-color: var(--error);
-    }
-    
-    .notification.warning {
-        background-color: var(--warning);
-        color: var(--text);
-    }
-    
-    .notification.info {
-        background-color: var(--info);
-    }
-    
-    .badge {
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        color: white;
-        font-size: 0.8rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-    }
-`;
-document.head.appendChild(style);
+}
+
+// Inicializar teste (opcional - remova em produção)
+// testConnection();
