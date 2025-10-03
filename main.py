@@ -57,7 +57,7 @@ async def handle_supabase_errors(request: Request, exc: APIError):
 # --------------------------------------------------------------------------
 class UserProfile(BaseModel):
     id: str
-    role: str
+    role: str = "user"
     allowed_pages: List[str] = []
     email: Optional[str] = None
 
@@ -69,17 +69,45 @@ async def get_current_user(authorization: str = Header(None)) -> UserProfile:
         user_response = supabase.auth.get_user(jwt)
         user = user_response.user
         user_id = user.id
-        profile_response = supabase.table('profiles').select('role, allowed_pages').eq('id', user_id).single().execute()
+        
+        # Buscar o perfil completo
+        profile_response = supabase.table('profiles').select('*').eq('id', user_id).single().execute()
+        
         if not profile_response.data:
-            raise HTTPException(status_code=404, detail="Perfil do usuário não encontrado.")
+            # Criar perfil padrão se não existir
+            try:
+                new_profile = {
+                    'id': user_id,
+                    'full_name': user.email or 'Usuário',
+                    'role': 'user',
+                    'allowed_pages': []  # Array vazio, não JSON
+                }
+                supabase.table('profiles').insert(new_profile).execute()
+                profile_data = new_profile
+            except Exception as e:
+                logging.error(f"Erro ao criar perfil padrão: {e}")
+                # Se não conseguir criar, usar valores padrão
+                profile_data = {'role': 'user', 'allowed_pages': []}
+        else:
+            profile_data = profile_response.data
+        
+        # GARANTIR que role e allowed_pages sempre tenham valores
+        role = profile_data.get('role', 'user')
+        allowed_pages = profile_data.get('allowed_pages', [])
+        
+        # Se allowed_pages for None, converter para array vazio
+        if allowed_pages is None:
+            allowed_pages = []
+        
         return UserProfile(
             id=user_id, 
-            role=profile_response.data.get('role', 'user'), 
-            allowed_pages=profile_response.data.get('allowed_pages', []),
+            role=role,
+            allowed_pages=allowed_pages,
             email=user.email
         )
     except Exception as e:
-        if isinstance(e, APIError): raise e
+        if isinstance(e, APIError): 
+            raise e
         logging.error(f"Erro de validação de token: {e}")
         raise HTTPException(status_code=401, detail="Token inválido ou expirado")
 
@@ -91,13 +119,27 @@ async def get_current_user_optional(authorization: str = Header(None)) -> Option
         user_response = supabase.auth.get_user(jwt)
         user = user_response.user
         user_id = user.id
-        profile_response = supabase.table('profiles').select('role, allowed_pages').eq('id', user_id).single().execute()
+        
+        profile_response = supabase.table('profiles').select('*').eq('id', user_id).single().execute()
+        
         if not profile_response.data:
-            return None
+            return UserProfile(
+                id=user_id,
+                role='user',
+                allowed_pages=[],
+                email=user.email
+            )
+        
+        profile_data = profile_response.data
+        
+        # Garantir valores não nulos
+        role = profile_data.get('role', 'user')
+        allowed_pages = profile_data.get('allowed_pages', [])
+        
         return UserProfile(
             id=user_id, 
-            role=profile_response.data.get('role', 'user'), 
-            allowed_pages=profile_response.data.get('allowed_pages', []),
+            role=role,
+            allowed_pages=allowed_pages,
             email=user.email
         )
     except Exception as e:
@@ -394,13 +436,17 @@ async def get_my_profile(current_user: UserProfile = Depends(get_current_user)):
         profile_data = response.data
         
         if profile_data:
+            # Garantir campos obrigatórios - usar get com valor padrão
+            profile_data['role'] = profile_data.get('role', 'user')
+            profile_data['allowed_pages'] = profile_data.get('allowed_pages', [])
+            
             try:
                 user_response = supabase.auth.get_user()
                 if user_response.user:
                     profile_data['email'] = user_response.user.email
             except Exception as e:
                 logging.error(f"Erro ao buscar email do usuário: {e}")
-                profile_data['email'] = "Não disponível"
+                profile_data['email'] = current_user.email or "Não disponível"
         
         return profile_data
     except Exception as e:
