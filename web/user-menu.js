@@ -1,4 +1,5 @@
-// user-menu.js
+// user-menu.js - COMPLETO E FINAL
+
 document.addEventListener('DOMContentLoaded', function() {
     class UserMenu {
         constructor() {
@@ -23,7 +24,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.showLoadingState();
                 console.log('📡 Buscando dados do usuário...');
                 
-                // Usa a função fetchUserProfile do auth.js que já está funcionando
                 const userData = await this.fetchRealUserData();
                 
                 if (userData) {
@@ -44,7 +44,6 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 console.log('🌐 Buscando dados reais do usuário...');
                 
-                // Método 1: Tenta usar a função fetchUserProfile do auth.js
                 if (typeof fetchUserProfile === 'function') {
                     console.log('📚 Usando fetchUserProfile do auth.js');
                     const profile = await fetchUserProfile();
@@ -59,7 +58,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
                 
-                // Método 2: Se não encontrar a função, faz a requisição diretamente
                 console.log('🔧 Fazendo requisição direta para /api/users/me');
                 const response = await authenticatedFetch('/api/users/me');
                 
@@ -78,14 +76,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 
             } catch (error) {
                 console.error('❌ Erro ao buscar dados reais:', error);
-                
-                // Método 3: Tenta dados do localStorage como último recurso
-                const storedUser = localStorage.getItem('currentUser');
-                if (storedUser) {
-                    console.log('📦 Usando dados do localStorage');
-                    return JSON.parse(storedUser);
-                }
-                
                 return null;
             }
         }
@@ -93,93 +83,62 @@ document.addEventListener('DOMContentLoaded', function() {
         updateUI(userData) {
             console.log('🎨 Atualizando UI com dados reais:', userData);
             
-            // Nome do usuário
             if (this.userName) {
                 this.userName.textContent = userData.name || userData.email || 'Usuário';
                 console.log('✏️ Nome definido como:', this.userName.textContent);
             }
 
-            // Nível/função do usuário
             if (this.userRole) {
                 const roleText = this.getRoleDisplayText(userData.role);
                 this.userRole.textContent = roleText;
                 console.log('🎯 Nível definido como:', roleText);
-                
-                // Adicionar classe para estilização diferenciada
-                this.userRole.className = 'user-role';
-                if (userData.role === 'admin') {
-                    this.userRole.classList.add('admin-role');
-                } else if (userData.role === 'moderator') {
-                    this.userRole.classList.add('moderator-role');
-                }
             }
 
-            // Avatar do usuário
             if (this.userAvatar) {
                 if (userData.avatar) {
-                    this.userAvatar.src = userData.avatar;
+                    // Adiciona um timestamp para evitar problemas de cache do navegador
+                    this.userAvatar.src = `${userData.avatar}?t=${new Date().getTime()}`;
                     this.userAvatar.onerror = () => this.setDefaultAvatar(userData);
                 } else {
                     this.setDefaultAvatar(userData);
                 }
-                
                 this.userAvatar.alt = `Avatar de ${userData.name || 'Usuário'}`;
                 console.log('🖼️ Avatar definido');
             }
 
-            // Salvar dados reais para uso futuro
             localStorage.setItem('currentUser', JSON.stringify(userData));
-            
-            // Remover estado de loading
             this.hideLoadingState();
-            
             console.log('✅ UI atualizada com dados reais');
         }
 
         setDefaultAvatar(userData) {
             const name = userData.name || userData.email || 'U';
             const backgroundColor = userData.role === 'admin' ? 'ef4444' : '4f46e5';
-            this.userAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${backgroundColor}&color=fff&size=128&bold=true`;
+            this.userAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name )}&background=${backgroundColor}&color=fff&size=128&bold=true`;
             console.log('🖼️ Avatar padrão gerado para:', name);
         }
 
         getRoleDisplayText(role) {
-            const roleMap = {
-                'admin': 'Administrador',
-                'moderator': 'Moderador', 
-                'user': 'Usuário',
-                'viewer': 'Visualizador'
-            };
-            
+            const roleMap = {'admin': 'Administrador', 'user': 'Usuário'};
             return roleMap[role] || 'Usuário';
         }
 
         setupEventListeners() {
             console.log('🎮 Configurando event listeners...');
             
-            // Toggle do dropdown
             if (this.userMenuBtn && this.userDropdown) {
                 this.userMenuBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.toggleDropdown();
                 });
-
                 document.addEventListener('click', (e) => {
                     if (!this.userMenuBtn.contains(e.target) && !this.userDropdown.contains(e.target)) {
                         this.closeDropdown();
                     }
                 });
-
-                document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
-                        this.closeDropdown();
-                    }
-                });
-                
                 console.log('✅ Dropdown configurado');
             }
 
-            // Logout
             if (this.logoutBtn) {
                 this.logoutBtn.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -187,68 +146,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 console.log('✅ Logout configurado');
             }
+
+            // ==================================================================
+            // --- OUVE O EVENTO DE ATUALIZAÇÃO DE PERFIL ---
+            console.log('👂 Configurando ouvinte para o evento [profileUpdated].');
+            window.addEventListener('profileUpdated', (event) => {
+                console.log('🎉 Evento [profileUpdated] recebido!', event.detail);
+                // Simplesmente recarrega as informações do usuário do zero
+                // para garantir que todos os dados (nome, foto, etc.) sejam atualizados.
+                this.loadUserInfo(); 
+            });
+            // ==================================================================
             
             console.log('🎯 Todos os event listeners configurados');
         }
 
         toggleDropdown() {
             this.userDropdown.classList.toggle('active');
-            
-            const chevron = this.userMenuBtn.querySelector('.fa-chevron-down');
-            if (chevron) {
-                chevron.style.transform = this.userDropdown.classList.contains('active') 
-                    ? 'rotate(180deg)' 
-                    : 'rotate(0deg)';
-            }
         }
 
         closeDropdown() {
             this.userDropdown.classList.remove('active');
-            
-            const chevron = this.userMenuBtn.querySelector('.fa-chevron-down');
-            if (chevron) {
-                chevron.style.transform = 'rotate(0deg)';
-            }
         }
 
         async handleLogout() {
             if (confirm('Tem certeza que deseja sair?')) {
-                try {
-                    // Usa a função signOut do auth.js que já está funcionando
-                    if (typeof signOut === 'function') {
-                        await signOut();
-                    } else {
-                        await this.performLogout();
-                    }
-                    
-                    this.showNotification('Logout realizado com sucesso', 'success');
-                    
-                } catch (error) {
-                    console.error('Erro ao fazer logout:', error);
-                    this.showNotification('Erro ao fazer logout', 'error');
+                if (typeof signOut === 'function') {
+                    await signOut();
                 }
             }
-        }
-
-        async performLogout() {
-            try {
-                const response = await authenticatedFetch('/api/auth/logout', {
-                    method: 'POST'
-                });
-                this.clearLocalData();
-                
-            } catch (error) {
-                console.error('Erro na API de logout:', error);
-                this.clearLocalData();
-            }
-        }
-
-        clearLocalData() {
-            localStorage.removeItem('supabase.auth.token');
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('currentUser');
-            sessionStorage.clear();
-            console.log('🧹 Dados locais limpos');
         }
 
         showLoadingState() {
@@ -271,42 +197,10 @@ document.addEventListener('DOMContentLoaded', function() {
         handleNoUserData() {
             if (this.userName) this.userName.textContent = 'Usuário Não Logado';
             if (this.userRole) this.userRole.textContent = '---';
-            this.showNotification('Usuário não autenticado', 'warning');
-            
-            setTimeout(() => {
-                window.location.href = '/login.html';
-            }, 2000);
-        }
-
-        showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.innerHTML = `
-                <i class="fas fa-${this.getNotificationIcon(type)}"></i>
-                <span>${message}</span>
-            `;
-            
-            document.body.appendChild(notification);
-            
-            setTimeout(() => notification.classList.add('show'), 10);
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => notification.remove(), 300);
-            }, 4000);
-        }
-
-        getNotificationIcon(type) {
-            const icons = {
-                'success': 'check-circle',
-                'error': 'exclamation-circle',
-                'warning': 'exclamation-triangle',
-                'info': 'info-circle'
-            };
-            return icons[type] || 'info-circle';
+            setTimeout(() => { window.location.href = '/login.html'; }, 1000);
         }
     }
 
-    // Inicializar apenas se os elementos existirem
     if (document.getElementById('userMenuBtn')) {
         console.log('🚀 Iniciando UserMenu...');
         new UserMenu();
