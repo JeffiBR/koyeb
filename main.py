@@ -59,7 +59,7 @@ class UserProfile(BaseModel):
     id: str
     role: str
     allowed_pages: List[str] = []
-    email: Optional[str] = None  # Adicionado campo email
+    email: Optional[str] = None
 
 async def get_current_user(authorization: str = Header(None)) -> UserProfile:
     if not authorization or not authorization.startswith("Bearer "):
@@ -76,14 +76,13 @@ async def get_current_user(authorization: str = Header(None)) -> UserProfile:
             id=user_id, 
             role=profile_response.data.get('role', 'user'), 
             allowed_pages=profile_response.data.get('allowed_pages', []),
-            email=user.email  # Incluir email no retorno
+            email=user.email
         )
     except Exception as e:
         if isinstance(e, APIError): raise e
         logging.error(f"Erro de validação de token: {e}")
         raise HTTPException(status_code=401, detail="Token inválido ou expirado")
 
-# --- Dependência opcional para obter o usuário atual (se estiver logado) ---
 async def get_current_user_optional(authorization: str = Header(None)) -> Optional[UserProfile]:
     if not authorization or not authorization.startswith("Bearer "):
         return None
@@ -99,7 +98,7 @@ async def get_current_user_optional(authorization: str = Header(None)) -> Option
             id=user_id, 
             role=profile_response.data.get('role', 'user'), 
             allowed_pages=profile_response.data.get('allowed_pages', []),
-            email=user.email  # Incluir email no retorno
+            email=user.email
         )
     except Exception as e:
         return None
@@ -131,29 +130,58 @@ app.add_middleware(
 # --- 4. MODELOS DE DADOS (PYDANTIC) ---
 # --------------------------------------------------------------------------
 class Categoria(BaseModel):
-    id: Optional[int] = None; nome: str; palavras_chave: List[str]; regra_unidade: Optional[str] = None
+    id: Optional[int] = None
+    nome: str
+    palavras_chave: List[str]
+    regra_unidade: Optional[str] = None
+
 class UserCreate(BaseModel):
-    email: str; password: str; full_name: str; role: str; allowed_pages: List[str] = []
+    email: str
+    password: str
+    full_name: str
+    role: str
+    allowed_pages: List[str] = []
+
 class UserUpdate(BaseModel):
-    full_name: str; role: str; allowed_pages: List[str]
-class ProfileUpdate(BaseModel):
+    full_name: str
+    role: str
+    allowed_pages: List[str]
+
+class ProfileUpdateWithCredentials(BaseModel):
     full_name: str
     job_title: str
     avatar_url: Optional[str] = None
     email: Optional[str] = None
     current_password: Optional[str] = None
     new_password: Optional[str] = None
+
+    class Config:
+        extra = "forbid"
+
 class Supermercado(BaseModel):
-    id: Optional[int] = None; nome: str; cnpj: str; endereco: Optional[str] = None
+    id: Optional[int] = None
+    nome: str
+    cnpj: str
+    endereco: Optional[str] = None
+
 class RealtimeSearchRequest(BaseModel):
-    produto: str; cnpjs: List[str]
+    produto: str
+    cnpjs: List[str]
+
 class PriceHistoryRequest(BaseModel):
-    product_identifier: str; cnpjs: List[str]; end_date: date = Field(default_factory=date.today); start_date: date = Field(default_factory=lambda: date.today() - timedelta(days=29))
+    product_identifier: str
+    cnpjs: List[str]
+    end_date: date = Field(default_factory=date.today)
+    start_date: date = Field(default_factory=lambda: date.today() - timedelta(days=29))
+
 class PruneByCollectionsRequest(BaseModel):
-    cnpj: str; collection_ids: List[int]
+    cnpj: str
+    collection_ids: List[int]
+
 class LogDeleteRequest(BaseModel):
     date: Optional[date] = None
     user_id: Optional[str] = None
+
 class CustomActionRequest(BaseModel):
     action_type: str
     page: str
@@ -173,21 +201,17 @@ def log_search(term: str, type: str, cnpjs: Optional[List[str]], count: int, use
         
         if user_id:
             try:
-                # Buscar informações completas do perfil do usuário
                 profile_response = supabase_admin.table('profiles').select('full_name').eq('id', user_id).single().execute()
                 if profile_response.data:
                     user_name = profile_response.data.get('full_name')
                 
-                # Buscar email do usuário do Auth
                 auth_response = supabase_admin.auth.admin.get_user_by_id(user_id)
                 if auth_response.user:
                     user_email = auth_response.user.email
-                    # Se não encontrou nome no perfil, usar email como nome
                     if not user_name:
                         user_name = user_email
             except Exception as e:
                 logging.error(f"Erro ao buscar informações do usuário {user_id}: {e}")
-                # Tentar buscar apenas o email como fallback
                 try:
                     auth_response = supabase_admin.auth.admin.get_user_by_id(user_id)
                     if auth_response.user:
@@ -206,7 +230,6 @@ def log_search(term: str, type: str, cnpjs: Optional[List[str]], count: int, use
             "result_count": count
         }
         
-        # Usar supabase_admin para garantir permissões
         supabase_admin.table('log_de_usuarios').insert(log_data).execute()
         logging.info(f"Log de busca salvo para usuário {user_id}: {term}")
         
@@ -221,16 +244,13 @@ def log_page_access(page_key: str, user: UserProfile):
         
         if user.id:
             try:
-                # Buscar informações completas do perfil
                 profile_response = supabase_admin.table('profiles').select('full_name').eq('id', user.id).single().execute()
                 if profile_response.data:
                     user_name = profile_response.data.get('full_name')
                 
-                # Buscar email do usuário
                 auth_response = supabase_admin.auth.admin.get_user_by_id(user.id)
                 if auth_response.user:
                     user_email = auth_response.user.email
-                    # Se não encontrou nome no perfil, usar email como nome
                     if not user_name:
                         user_name = user_email
             except Exception as e:
@@ -257,7 +277,6 @@ def log_custom_action_internal(request: CustomActionRequest, user: Optional[User
         
         if user_id:
             try:
-                # Buscar informações do usuário
                 profile_response = supabase_admin.table('profiles').select('full_name').eq('id', user_id).single().execute()
                 if profile_response.data:
                     user_name = profile_response.data.get('full_name')
@@ -327,7 +346,6 @@ async def update_user(user_id: str, user_data: UserUpdate, admin_user: UserProfi
 @app.get("/api/users")
 async def list_users(admin_user: UserProfile = Depends(require_page_access('users'))):
     try:
-        # Buscar perfis da tabela
         profiles_response = supabase.table('profiles').select(
             'id, full_name, role, allowed_pages, avatar_url'
         ).execute()
@@ -337,7 +355,6 @@ async def list_users(admin_user: UserProfile = Depends(require_page_access('user
         for profile in profiles:
             email = None
             try:
-                # Buscar e-mail no Supabase Auth
                 auth_response = supabase_admin.auth.admin.get_user_by_id(profile['id'])
                 if auth_response.user:
                     email = auth_response.user.email
@@ -359,7 +376,6 @@ async def list_users(admin_user: UserProfile = Depends(require_page_access('user
         logging.error(f"Erro ao listar usuários: {e}")
         raise HTTPException(status_code=500, detail="Erro interno ao listar usuários")
 
-
 @app.delete("/api/users/{user_id}", status_code=204)
 async def delete_user(user_id: str, admin_user: UserProfile = Depends(require_page_access('users'))):
     try:
@@ -373,69 +389,97 @@ async def delete_user(user_id: str, admin_user: UserProfile = Depends(require_pa
 # --- Gerenciamento de Perfil Pessoal ---
 @app.get("/api/users/me")
 async def get_my_profile(current_user: UserProfile = Depends(get_current_user)):
-    response = supabase.table('profiles').select('*').eq('id', current_user.id).single().execute()
-    profile_data = response.data
-    if profile_data:
-        # Incluir email do usuário na resposta
-        try:
-            user_response = supabase.auth.get_user()
-            if user_response.user:
-                profile_data['email'] = user_response.user.email
-        except Exception as e:
-            logging.error(f"Erro ao buscar email do usuário: {e}")
-    return profile_data
+    try:
+        response = supabase.table('profiles').select('*').eq('id', current_user.id).single().execute()
+        profile_data = response.data
+        
+        if profile_data:
+            try:
+                user_response = supabase.auth.get_user()
+                if user_response.user:
+                    profile_data['email'] = user_response.user.email
+            except Exception as e:
+                logging.error(f"Erro ao buscar email do usuário: {e}")
+                profile_data['email'] = "Não disponível"
+        
+        return profile_data
+    except Exception as e:
+        logging.error(f"Erro ao buscar perfil do usuário: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao carregar perfil")
 
 @app.put("/api/users/me")
-async def update_my_profile(profile_data: ProfileUpdate, current_user: UserProfile = Depends(get_current_user)):
-    update_data = profile_data.dict(exclude_unset=True, exclude={'email', 'current_password', 'new_password'})
-    
-    # Se o usuário está tentando alterar o e-mail ou a senha, deve fornecer a senha atual
-    if profile_data.email or profile_data.new_password:
-        if not profile_data.current_password:
-            raise HTTPException(status_code=400, detail="Senha atual é necessária para alterar o e-mail ou a senha.")
+async def update_my_profile(profile_data: ProfileUpdateWithCredentials, current_user: UserProfile = Depends(get_current_user)):
+    try:
+        # Preparar dados para atualização do perfil
+        profile_update_data = {
+            "full_name": profile_data.full_name,
+            "job_title": profile_data.job_title,
+        }
         
-        # Verificar a senha atual tentando fazer login
-        try:
-            # Buscar email atual do usuário
-            user_response = supabase.auth.get_user()
-            current_email = user_response.user.email
+        # Incluir avatar_url apenas se não for None
+        if profile_data.avatar_url is not None:
+            profile_update_data["avatar_url"] = profile_data.avatar_url
+        
+        # Remover campos vazios
+        profile_update_data = {k: v for k, v in profile_update_data.items() if v is not None}
+        
+        # Verificar se precisa atualizar email ou senha
+        if profile_data.email or profile_data.new_password:
+            if not profile_data.current_password:
+                raise HTTPException(status_code=400, detail="Senha atual é necessária para alterar o e-mail ou a senha.")
             
-            auth_response = supabase.auth.sign_in_with_password({
-                "email": current_email,
-                "password": profile_data.current_password
-            })
-            # Se não lançar exceção, a senha está correta
-        except Exception as e:
-            raise HTTPException(status_code=400, detail="Senha atual incorreta.")
-    
-    # Atualizar e-mail se fornecido e diferente do atual
-    if profile_data.email:
-        try:
-            user_response = supabase.auth.get_user()
-            current_email = user_response.user.email
-            
-            if profile_data.email != current_email:
-                update_result = supabase.auth.update_user({"email": profile_data.email})
-                # O Supabase enviará um e-mail de confirmação para o novo e-mail
-                logging.info(f"E-mail atualizado para {profile_data.email}. Confirmação necessária.")
-        except Exception as e:
-            raise HTTPException(status_code=400, detail="Erro ao atualizar o e-mail.")
-    
-    # Atualizar senha se fornecida
-    if profile_data.new_password:
-        try:
-            if len(profile_data.new_password) < 6:
-                raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres.")
+            # Verificar a senha atual
+            try:
+                user_response = supabase.auth.get_user()
+                current_email = user_response.user.email
                 
-            update_result = supabase.auth.update_user({"password": profile_data.new_password})
-            logging.info("Senha atualizada com sucesso.")
-        except Exception as e:
-            raise HTTPException(status_code=400, detail="Erro ao atualizar a senha.")
-    
-    # Atualizar dados básicos do perfil
-    response = supabase.table('profiles').update(update_data).eq('id', current_user.id).execute()
-    
-    return response.data
+                # Tentar fazer login com a senha atual
+                auth_response = supabase.auth.sign_in_with_password({
+                    "email": current_email,
+                    "password": profile_data.current_password
+                })
+            except Exception as e:
+                raise HTTPException(status_code=400, detail="Senha atual incorreta.")
+        
+        # Atualizar email se fornecido
+        if profile_data.email:
+            try:
+                user_response = supabase.auth.get_user()
+                current_email = user_response.user.email
+                
+                if profile_data.email != current_email:
+                    update_result = supabase.auth.update_user({"email": profile_data.email})
+                    logging.info(f"E-mail atualizado para {profile_data.email}. Confirmação necessária.")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Erro ao atualizar o e-mail: {str(e)}")
+        
+        # Atualizar senha se fornecida
+        if profile_data.new_password:
+            try:
+                if len(profile_data.new_password) < 6:
+                    raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres.")
+                    
+                update_result = supabase.auth.update_user({"password": profile_data.new_password})
+                logging.info("Senha atualizada com sucesso.")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Erro ao atualizar a senha: {str(e)}")
+        
+        # Atualizar dados do perfil na tabela profiles
+        if profile_update_data:
+            response = supabase.table('profiles').update(profile_update_data).eq('id', current_user.id).execute()
+            
+            if not response.data:
+                raise HTTPException(status_code=404, detail="Perfil não encontrado")
+                
+            return response.data[0]
+        else:
+            return {"message": "Nenhum dado para atualizar"}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Erro ao atualizar perfil: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno ao atualizar perfil")
 
 # --- Gerenciamento de Categorias ---
 @app.get("/api/categories", response_model=List[Categoria])
@@ -551,10 +595,8 @@ async def get_user_logs(
         start_index = (page - 1) * page_size
         end_index = start_index + page_size - 1
         
-        # Construir query base
         query = supabase.table('log_de_usuarios').select('*', count='exact')
         
-        # Aplicar filtros
         if user_id:
             query = query.eq('user_id', user_id)
         if date:
@@ -562,14 +604,12 @@ async def get_user_logs(
         if action_type:
             query = query.eq('action_type', action_type)
         
-        # Ordenar e paginar
         response = query.order('created_at', desc=True).range(start_index, end_index).execute()
         
-        # Processar logs
         user_logs = []
         for log in response.data:
             user_logs.append({
-                'id': log['id'],  # CORREÇÃO: usar 'id' em vez de 'log_id'
+                'id': log['id'],
                 'user_id': log.get('user_id'),
                 'user_name': log.get('user_name') or 'N/A',
                 'user_email': log.get('user_email') or 'N/A',
@@ -633,7 +673,6 @@ async def export_user_logs(
         import csv
         import io
         
-        # Buscar todos os logs (sem paginação para exportação)
         query = supabase.table('log_de_usuarios').select('*')
         
         if user_id:
@@ -648,14 +687,11 @@ async def export_user_logs(
         if not response.data:
             raise HTTPException(status_code=404, detail="Nenhum log encontrado para exportação")
         
-        # Criar CSV em memória
         output = io.StringIO()
         writer = csv.writer(output)
         
-        # Escrever cabeçalho
         writer.writerow(['ID', 'Usuário', 'Email', 'Ação', 'Termo Pesquisado', 'Mercados', 'Resultados', 'Página Acessada', 'Data/Hora'])
         
-        # Escrever dados
         for log in response.data:
             writer.writerow([
                 log['id'],
@@ -705,7 +741,6 @@ async def log_page_access_endpoint(
     background_tasks: BackgroundTasks,
     current_user: UserProfile = Depends(get_current_user)
 ):
-    """Endpoint para registrar acesso às páginas do sistema."""
     page_key = request.get('page_key')
     if not page_key:
         raise HTTPException(status_code=400, detail="page_key é obrigatório")
@@ -719,7 +754,6 @@ async def log_custom_action(
     background_tasks: BackgroundTasks,
     current_user: UserProfile = Depends(get_current_user_optional)
 ):
-    """Endpoint para registrar ações customizadas dos usuários."""
     background_tasks.add_task(log_custom_action_internal, request, current_user)
     return {"message": "Ação customizada registrada"}
 
@@ -729,9 +763,7 @@ async def get_usage_statistics(
     end_date: date = Query(..., description="Data final (YYYY-MM-DD)"),
     user: UserProfile = Depends(require_page_access('user_logs'))
 ):
-    """Endpoint para obter estatísticas de uso do sistema."""
     try:
-        # Estatísticas de acesso por página
         page_stats_response = supabase_admin.table('log_de_usuarios') \
             .select('page_accessed', count='exact') \
             .eq('action_type', 'access') \
@@ -739,14 +771,12 @@ async def get_usage_statistics(
             .lte('created_at', f'{end_date} 23:59:59') \
             .execute()
         
-        # Estatísticas de usuários ativos
         active_users_response = supabase_admin.table('log_de_usuarios') \
             .select('user_id', count='exact') \
             .gte('created_at', str(start_date)) \
             .lte('created_at', f'{end_date} 23:59:59') \
             .execute()
         
-        # Top ações
         top_actions_response = supabase_admin.table('log_de_usuarios') \
             .select('action_type', count='exact') \
             .gte('created_at', str(start_date)) \
@@ -789,7 +819,6 @@ async def search_products(
     if cnpjs: query = query.in_('cnpj_supermercado', cnpjs)
     response = query.limit(500).execute()
     
-    # Log da busca com user se disponível
     background_tasks.add_task(log_search, q, 'database', cnpjs, len(response.data), current_user)
     
     if not response.data: return {"results": []}
@@ -824,7 +853,6 @@ async def realtime_search(
         elif resultado:
             resultados_finais.extend(resultado)
     
-    # Log da busca em tempo real com user se disponível
     background_tasks.add_task(log_search, request.produto, 'realtime', request.cnpjs, len(resultados_finais), current_user)
     
     return {"results": sorted(resultados_finais, key=lambda x: x.get('preco_produto', float('inf')))}
