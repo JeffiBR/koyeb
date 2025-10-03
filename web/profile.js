@@ -138,6 +138,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             currentUserProfile = await response.json();
+            
+            // Debug dos dados
+            console.log('Dados do perfil recebidos:', currentUserProfile);
+            
             originalProfileData = { ...currentUserProfile };
 
             // Preenche o formulário
@@ -220,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Processa o upload da foto de perfil
+     * Processa o upload da foto de perfil usando o cliente Supabase já inicializado
      */
     const handleAvatarUpload = async () => {
         const file = avatarFileInput.files[0];
@@ -232,6 +236,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const session = await getSession();
             if (!session) {
                 throw new Error('Sessão não encontrada.');
+            }
+
+            // Usa o cliente Supabase já inicializado no auth.js
+            if (typeof supabase === 'undefined') {
+                throw new Error('Cliente Supabase não disponível.');
             }
 
             const fileExt = file.name.split('.').pop();
@@ -267,6 +276,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentUserProfile?.avatar_url) return null;
 
         try {
+            // Usa o cliente Supabase já inicializado no auth.js
+            if (typeof supabase === 'undefined') {
+                console.warn('Cliente Supabase não disponível para remoção do avatar.');
+                return null;
+            }
+
             // Extrai o caminho do arquivo da URL
             const url = new URL(currentUserProfile.avatar_url);
             const pathParts = url.pathname.split('/');
@@ -344,6 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!response.ok) {
                 const errorData = await response.json();
+                console.error('Erro da API:', errorData);
                 throw errorData;
             }
 
