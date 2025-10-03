@@ -351,6 +351,79 @@ def log_custom_action_internal(request: CustomActionRequest, user: Optional[User
 # --- 6. ENDPOINTS DA APLICAÇÃO ---
 # --------------------------------------------------------------------------
 
+# --- Gerenciamento de Perfil Pessoal ---
+@app.get("/api/users/me")
+async def get_my_profile(current_user: UserProfile = Depends(get_current_user)):
+    try:
+        response = supabase.table('profiles').select('*').eq('id', current_user.id).single().execute()
+        profile_data = response.data
+        
+        if profile_data:
+            # Garantir campos obrigatórios - usar get com valor padrão
+            profile_data['role'] = profile_data.get('role', 'user')
+            profile_data['allowed_pages'] = profile_data.get('allowed_pages', [])
+            
+            try:
+                user_response = supabase.auth.get_user()
+                if user_response.user:
+                    profile_data['email'] = user_response.user.email
+            except Exception as e:
+                logging.error(f"Erro ao buscar email do usuário: {e}")
+                profile_data['email'] = current_user.email or "Não disponível"
+        
+        return profile_data
+    except Exception as e:
+        logging.error(f"Erro ao buscar perfil do usuário: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao carregar perfil")
+
+# VERSÃO NOVA E CORRIGIDA
+@app.put("/api/users/me")
+async def update_my_profile(profile_data: ProfileUpdateWithCredentials, current_user: UserProfile = Depends(get_current_user)):
+    try:
+        # 1. Preparar dados para a tabela 'profiles'
+        # Usamos exclude_unset=True para enviar apenas os campos que o frontend mandou
+        profile_update_data = profile_data.dict(exclude_unset=True, exclude={'current_password', 'new_password', 'email'})
+
+        # 2. Lidar com alteração de e-mail e senha
+        if profile_data.email or profile_data.new_password:
+            if not profile_data.current_password:
+                raise HTTPException(status_code=400, detail="Senha atual é necessária para alterar e-mail ou senha.")
+
+            # Verificar a senha atual
+            try:
+                # Tenta fazer login com o e-mail do usuário logado e a senha fornecida
+                await supabase.auth.sign_in_with_password({
+                    "email": current_user.email,
+                    "password": profile_data.current_password
+                })
+            except Exception:
+                raise HTTPException(status_code=400, detail="Senha atual incorreta.")
+
+            # Atualizar e-mail no Supabase Auth
+            if profile_data.email and profile_data.email != current_user.email:
+                await supabase.auth.update_user({"email": profile_data.email})
+
+            # Atualizar senha no Supabase Auth
+            if profile_data.new_password:
+                if len(profile_data.new_password) < 6:
+                    raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres.")
+                await supabase.auth.update_user({"password": profile_data.new_password})
+
+        # 3. Atualizar dados na tabela 'profiles' se houver algo para atualizar
+        if profile_update_data:
+            response = await supabase.table('profiles').update(profile_update_data).eq('id', current_user.id).select().single().execute()
+            return response.data
+
+        # 4. Se nada foi alterado em 'profiles', buscar e retornar o perfil atual para confirmar o sucesso
+        response = await supabase.table('profiles').select('*').eq('id', current_user.id).single().execute()
+        return response.data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Erro CRÍTICO ao atualizar perfil: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro interno ao atualizar perfil: {str(e)}")
+
 # --- Gerenciamento de Usuários ---
 @app.post("/api/users")
 async def create_user(user_data: UserCreate, admin_user: UserProfile = Depends(require_page_access('users'))):
@@ -427,119 +500,6 @@ async def delete_user(user_id: str, admin_user: UserProfile = Depends(require_pa
     except Exception as e:
         logging.error(f"Falha ao excluir usuário {user_id}: {e}")
         raise HTTPException(status_code=400, detail="Não foi possível excluir o usuário.")
-
-# --- Gerenciamento de Perfil Pessoal ---
-@app.get("/api/users/me")
-async def get_my_profile(current_user: UserProfile = Depends(get_current_user)):
-    try:
-        response = supabase.table('profiles').select('*').eq('id', current_user.id).single().execute()
-        profile_data = response.data
-        
-        if profile_data:
-            # Garantir campos obrigatórios - usar get com valor padrão
-            profile_data['role'] = profile_data.get('role', 'user')
-            profile_data['allowed_pages'] = profile_data.get('allowed_pages', [])
-            
-            try:
-                user_response = supabase.auth.get_user()
-                if user_response.user:
-                    profile_data['email'] = user_response.user.email
-            except Exception as e:
-                logging.error(f"Erro ao buscar email do usuário: {e}")
-                profile_data['email'] = current_user.email or "Não disponível"
-        
-        return profile_data
-    except Exception as e:
-        logging.error(f"Erro ao buscar perfil do usuário: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao carregar perfil")
-
-# VERSÃO NOVA E CORRIGIDA
-@app.put("/api/users/me")
-async def update_my_profile(profile_data: ProfileUpdateWithCredentials, current_user: UserProfile = Depends(get_current_user)):
-    try:
-        # 1. Preparar dados para a tabela 'profiles'
-        # Usamos exclude_unset=True para enviar apenas os campos que o frontend mandou
-        profile_update_data = profile_data.dict(exclude_unset=True, exclude={'current_password', 'new_password', 'email'})
-
-        # 2. Lidar com alteração de e-mail e senha
-        if profile_data.email or profile_data.new_password:
-            if not profile_data.current_password:
-                raise HTTPException(status_code=400, detail="Senha atual é necessária para alterar e-mail ou senha.")
-
-            # Verificar a senha atual
-            try:
-                # Tenta fazer login com o e-mail do usuário logado e a senha fornecida
-                await supabase.auth.sign_in_with_password({
-                    "email": current_user.email,
-                    "password": profile_data.current_password
-                })
-            except Exception:
-                raise HTTPException(status_code=400, detail="Senha atual incorreta.")
-
-            # Atualizar e-mail no Supabase Auth
-            if profile_data.email and profile_data.email != current_user.email:
-                await supabase.auth.update_user({"email": profile_data.email})
-
-            # Atualizar senha no Supabase Auth
-            if profile_data.new_password:
-                if len(profile_data.new_password) < 6:
-                    raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres.")
-                await supabase.auth.update_user({"password": profile_data.new_password})
-
-        # 3. Atualizar dados na tabela 'profiles' se houver algo para atualizar
-        if profile_update_data:
-            response = await supabase.table('profiles').update(profile_update_data).eq('id', current_user.id).select().single().execute()
-            return response.data
-
-        # 4. Se nada foi alterado em 'profiles', buscar e retornar o perfil atual para confirmar o sucesso
-        response = await supabase.table('profiles').select('*').eq('id', current_user.id).single().execute()
-        return response.data
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"Erro CRÍTICO ao atualizar perfil: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Erro interno ao atualizar perfil: {str(e)}")
-        
-        # Atualizar email se fornecido
-        if profile_data.email:
-            try:
-                user_response = supabase.auth.get_user()
-                current_email = user_response.user.email
-                
-                if profile_data.email != current_email:
-                    update_result = supabase.auth.update_user({"email": profile_data.email})
-                    logging.info(f"E-mail atualizado para {profile_data.email}. Confirmação necessária.")
-            except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Erro ao atualizar o e-mail: {str(e)}")
-        
-        # Atualizar senha se fornecida
-        if profile_data.new_password:
-            try:
-                if len(profile_data.new_password) < 6:
-                    raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres.")
-                    
-                update_result = supabase.auth.update_user({"password": profile_data.new_password})
-                logging.info("Senha atualizada com sucesso.")
-            except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Erro ao atualizar a senha: {str(e)}")
-        
-        # Atualizar dados do perfil na tabela profiles
-        if profile_update_data:
-            response = supabase.table('profiles').update(profile_update_data).eq('id', current_user.id).execute()
-            
-            if not response.data:
-                raise HTTPException(status_code=404, detail="Perfil não encontrado")
-                
-            return response.data[0]
-        else:
-            return {"message": "Nenhum dado para atualizar"}
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"Erro ao atualizar perfil: {e}")
-        raise HTTPException(status_code=500, detail="Erro interno ao atualizar perfil")
 
 # --- Gerenciamento de Categorias ---
 @app.get("/api/categories", response_model=List[Categoria])
@@ -988,6 +948,3 @@ app.mount("/", StaticFiles(directory="web", html=True), name="static")
 @app.get("/")
 def read_root():
     return {"message": "Bem-vindo à API de Preços AL - Versão 3.1.2"}
-
-
-
