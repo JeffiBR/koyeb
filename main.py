@@ -38,8 +38,12 @@ if not all([SUPABASE_URL, SUPABASE_KEY, SERVICE_ROLE_KEY, ECONOMIZA_ALAGOAS_TOKE
     exit(1)
 
 # --- Clientes Supabase ---
+# Cliente síncrono para operações que não precisam de async
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 supabase_admin: Client = create_client(SUPABASE_URL, SERVICE_ROLE_KEY)
+
+# Cliente assíncrono (usaremos uma abordagem diferente)
+# Para operações assíncronas, vamos usar o cliente síncrono com asyncio.to_thread
 
 # --------------------------------------------------------------------------
 # --- 2. TRATAMENTO DE ERROS CENTRALIZADO ---
@@ -70,8 +74,10 @@ async def get_current_user(authorization: str = Header(None)) -> UserProfile:
         user = user_response.user
         user_id = user.id
         
-        # Buscar o perfil completo
-        profile_response = supabase.table('profiles').select('*').eq('id', user_id).single().execute()
+        # Buscar o perfil completo - executar em thread separada
+        profile_response = await asyncio.to_thread(
+            supabase.table('profiles').select('*').eq('id', user_id).single().execute
+        )
         
         if not profile_response.data:
             # Criar perfil padrão se não existir
@@ -82,7 +88,9 @@ async def get_current_user(authorization: str = Header(None)) -> UserProfile:
                     'role': 'user',
                     'allowed_pages': []  # Array vazio, não JSON
                 }
-                supabase.table('profiles').insert(new_profile).execute()
+                await asyncio.to_thread(
+                    supabase.table('profiles').insert(new_profile).execute
+                )
                 profile_data = new_profile
             except Exception as e:
                 logging.error(f"Erro ao criar perfil padrão: {e}")
@@ -120,7 +128,9 @@ async def get_current_user_optional(authorization: str = Header(None)) -> Option
         user = user_response.user
         user_id = user.id
         
-        profile_response = supabase.table('profiles').select('*').eq('id', user_id).single().execute()
+        profile_response = await asyncio.to_thread(
+            supabase.table('profiles').select('*').eq('id', user_id).single().execute
+        )
         
         if not profile_response.data:
             return UserProfile(
@@ -355,7 +365,9 @@ def log_custom_action_internal(request: CustomActionRequest, user: Optional[User
 @app.get("/api/users/me")
 async def get_my_profile(current_user: UserProfile = Depends(get_current_user)):
     try:
-        response = supabase.table('profiles').select('*').eq('id', current_user.id).single().execute()
+        response = await asyncio.to_thread(
+            supabase.table('profiles').select('*').eq('id', current_user.id).single().execute
+        )
         profile_data = response.data
         
         if profile_data:
@@ -376,12 +388,11 @@ async def get_my_profile(current_user: UserProfile = Depends(get_current_user)):
         logging.error(f"Erro ao buscar perfil do usuário: {e}")
         raise HTTPException(status_code=500, detail="Erro ao carregar perfil")
 
-# VERSÃO NOVA E CORRIGIDA
+# VERSÃO CORRIGIDA - usando asyncio.to_thread para operações síncronas
 @app.put("/api/users/me")
 async def update_my_profile(profile_data: ProfileUpdateWithCredentials, current_user: UserProfile = Depends(get_current_user)):
     try:
         # 1. Preparar dados para a tabela 'profiles'
-        # Usamos exclude_unset=True para enviar apenas os campos que o frontend mandou
         profile_update_data = profile_data.dict(exclude_unset=True, exclude={'current_password', 'new_password', 'email'})
 
         # 2. Lidar com alteração de e-mail e senha
@@ -391,31 +402,42 @@ async def update_my_profile(profile_data: ProfileUpdateWithCredentials, current_
 
             # Verificar a senha atual
             try:
-                # Tenta fazer login com o e-mail do usuário logado e a senha fornecida
-                await supabase.auth.sign_in_with_password({
-                    "email": current_user.email,
-                    "password": profile_data.current_password
-                })
+                # Executar verificação de senha em thread separada
+                await asyncio.to_thread(
+                    lambda: supabase.auth.sign_in_with_password({
+                        "email": current_user.email,
+                        "password": profile_data.current_password
+                    })
+                )
             except Exception:
                 raise HTTPException(status_code=400, detail="Senha atual incorreta.")
 
             # Atualizar e-mail no Supabase Auth
             if profile_data.email and profile_data.email != current_user.email:
-                await supabase.auth.update_user({"email": profile_data.email})
+                await asyncio.to_thread(
+                    lambda: supabase.auth.update_user({"email": profile_data.email})
+                )
 
             # Atualizar senha no Supabase Auth
             if profile_data.new_password:
                 if len(profile_data.new_password) < 6:
                     raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres.")
-                await supabase.auth.update_user({"password": profile_data.new_password})
+                await asyncio.to_thread(
+                    lambda: supabase.auth.update_user({"password": profile_data.new_password})
+                )
 
         # 3. Atualizar dados na tabela 'profiles' se houver algo para atualizar
         if profile_update_data:
-            response = await supabase.table('profiles').update(profile_update_data).eq('id', current_user.id).execute()
-            return response.data
+            response = await asyncio.to_thread(
+                supabase.table('profiles').update(profile_update_data).eq('id', current_user.id).execute
+            )
+            if response.data:
+                return response.data[0]
 
         # 4. Se nada foi alterado em 'profiles', buscar e retornar o perfil atual para confirmar o sucesso
-        response = await supabase.table('profiles').select('*').eq('id', current_user.id).single().execute()
+        response = await asyncio.to_thread(
+            supabase.table('profiles').select('*').eq('id', current_user.id).single().execute
+        )
         return response.data
 
     except HTTPException:
@@ -429,16 +451,23 @@ async def update_my_profile(profile_data: ProfileUpdateWithCredentials, current_
 async def create_user(user_data: UserCreate, admin_user: UserProfile = Depends(require_page_access('users'))):
     try:
         logging.info(f"Admin {admin_user.id} tentando criar usuário: {user_data.email}")
-        created_user_res = supabase_admin.auth.admin.create_user({
-            "email": user_data.email, "password": user_data.password,
-            "email_confirm": True, "user_metadata": {'full_name': user_data.full_name}
-        })
+        
+        # Executar em thread separada
+        created_user_res = await asyncio.to_thread(
+            lambda: supabase_admin.auth.admin.create_user({
+                "email": user_data.email, "password": user_data.password,
+                "email_confirm": True, "user_metadata": {'full_name': user_data.full_name}
+            })
+        )
+        
         user_id = created_user_res.user.id
         logging.info(f"Usuário criado no Auth com ID: {user_id}")
         
-        profile_update_response = supabase_admin.table('profiles').update({
-            'role': user_data.role, 'allowed_pages': user_data.allowed_pages
-        }).eq('id', user_id).execute()
+        profile_update_response = await asyncio.to_thread(
+            supabase_admin.table('profiles').update({
+                'role': user_data.role, 'allowed_pages': user_data.allowed_pages
+            }).eq('id', user_id).execute
+        )
         
         if not profile_update_response.data:
              logging.warning(f"Usuário {user_id} foi criado no Auth, mas o perfil não foi encontrado para atualizar.")
@@ -455,22 +484,28 @@ async def create_user(user_data: UserCreate, admin_user: UserProfile = Depends(r
 
 @app.put("/api/users/{user_id}")
 async def update_user(user_id: str, user_data: UserUpdate, admin_user: UserProfile = Depends(require_page_access('users'))):
-    supabase_admin.table('profiles').update(user_data.dict()).eq('id', user_id).execute()
+    await asyncio.to_thread(
+        lambda: supabase_admin.table('profiles').update(user_data.dict()).eq('id', user_id).execute()
+    )
     return {"message": "Usuário atualizado com sucesso"}
         
 @app.get("/api/users")
 async def list_users(admin_user: UserProfile = Depends(require_page_access('users'))):
     try:
-        profiles_response = supabase.table('profiles').select(
-            'id, full_name, role, allowed_pages, avatar_url'
-        ).execute()
+        profiles_response = await asyncio.to_thread(
+            supabase.table('profiles').select(
+                'id, full_name, role, allowed_pages, avatar_url'
+            ).execute
+        )
         profiles = profiles_response.data or []
 
         users = []
         for profile in profiles:
             email = None
             try:
-                auth_response = supabase_admin.auth.admin.get_user_by_id(profile['id'])
+                auth_response = await asyncio.to_thread(
+                    lambda: supabase_admin.auth.admin.get_user_by_id(profile['id'])
+                )
                 if auth_response.user:
                     email = auth_response.user.email
             except Exception as e:
@@ -494,7 +529,9 @@ async def list_users(admin_user: UserProfile = Depends(require_page_access('user
 @app.delete("/api/users/{user_id}", status_code=204)
 async def delete_user(user_id: str, admin_user: UserProfile = Depends(require_page_access('users'))):
     try:
-        supabase_admin.auth.admin.delete_user(user_id)
+        await asyncio.to_thread(
+            lambda: supabase_admin.auth.admin.delete_user(user_id)
+        )
         logging.info(f"Usuário com ID {user_id} foi excluído pelo admin {admin_user.id}")
         return
     except Exception as e:
@@ -504,23 +541,32 @@ async def delete_user(user_id: str, admin_user: UserProfile = Depends(require_pa
 # --- Gerenciamento de Categorias ---
 @app.get("/api/categories", response_model=List[Categoria])
 async def list_categories(user: UserProfile = Depends(get_current_user)):
-    resp = supabase.table('categorias').select('*').order('nome').execute()
+    resp = await asyncio.to_thread(
+        supabase.table('categorias').select('*').order('nome').execute
+    )
     return resp.data
 
 @app.post("/api/categories", response_model=Categoria)
 async def create_category(categoria: Categoria, admin_user: UserProfile = Depends(require_page_access('users'))):
-    resp = supabase.table('categorias').insert(categoria.dict(exclude={'id'})).execute()
+    resp = await asyncio.to_thread(
+        supabase.table('categorias').insert(categoria.dict(exclude={'id'})).execute
+    )
     return resp.data[0]
 
 @app.put("/api/categories/{id}", response_model=Categoria)
 async def update_category(id: int, categoria: Categoria, admin_user: UserProfile = Depends(require_page_access('users'))):
-    resp = supabase.table('categorias').update(categoria.dict(exclude={'id', 'created_at'})).eq('id', id).execute()
-    if not resp.data: raise HTTPException(status_code=404, detail="Categoria não encontrada")
+    resp = await asyncio.to_thread(
+        supabase.table('categorias').update(categoria.dict(exclude={'id', 'created_at'})).eq('id', id).execute
+    )
+    if not resp.data: 
+        raise HTTPException(status_code=404, detail="Categoria não encontrada")
     return resp.data[0]
 
 @app.delete("/api/categories/{id}", status_code=204)
 async def delete_category(id: int, admin_user: UserProfile = Depends(require_page_access('users'))):
-    supabase.table('categorias').delete().eq('id', id).execute()
+    await asyncio.to_thread(
+        lambda: supabase.table('categorias').delete().eq('id', id).execute()
+    )
     return
     
 # --- Gerenciamento da Coleta ---
@@ -539,7 +585,9 @@ async def get_collection_status(user: UserProfile = Depends(get_current_user)):
 # --- Gerenciamento de Supermercados ---
 @app.get("/api/supermarkets", response_model=List[Supermercado])
 async def list_supermarkets_admin(user: UserProfile = Depends(get_current_user)):
-    resp = supabase.table('supermercados').select('id, nome, cnpj, endereco').order('nome').execute()
+    resp = await asyncio.to_thread(
+        supabase.table('supermercados').select('id, nome, cnpj, endereco').order('nome').execute
+    )
     return resp.data
 
 @app.post("/api/supermarkets", status_code=201, response_model=Supermercado)
@@ -547,7 +595,9 @@ async def create_supermarket(market: Supermercado, user: UserProfile = Depends(r
     market_data = market.dict(exclude={'id'})
     market_data = {k: v for k, v in market_data.items() if v is not None}
     
-    resp = supabase.table('supermercados').insert(market_data).execute()
+    resp = await asyncio.to_thread(
+        supabase.table('supermercados').insert(market_data).execute
+    )
     return resp.data[0]
 
 @app.put("/api/supermarkets/{id}", response_model=Supermercado)
@@ -555,50 +605,66 @@ async def update_supermarket(id: int, market: Supermercado, user: UserProfile = 
     market_data = market.dict(exclude={'id'})
     market_data = {k: v for k, v in market_data.items() if v is not None}
     
-    resp = supabase.table('supermercados').update(market_data).eq('id', id).execute()
+    resp = await asyncio.to_thread(
+        supabase.table('supermercados').update(market_data).eq('id', id).execute
+    )
     if not resp.data: 
         raise HTTPException(status_code=404, detail="Mercado não encontrado")
     return resp.data[0]
 
 @app.delete("/api/supermarkets/{id}", status_code=204)
 async def delete_supermarket(id: int, user: UserProfile = Depends(require_page_access('markets'))):
-    supabase.table('supermercados').delete().eq('id', id).execute()
+    await asyncio.to_thread(
+        lambda: supabase.table('supermercados').delete().eq('id', id).execute()
+    )
     return
 
 # --- Endpoint Público de Supermercados ---
 @app.get("/api/supermarkets/public", response_model=List[Supermercado])
 async def list_supermarkets_public():
-    resp = supabase.table('supermercados').select('id, nome, cnpj, endereco').order('nome').execute()
+    resp = await asyncio.to_thread(
+        supabase.table('supermercados').select('id, nome, cnpj, endereco').order('nome').execute
+    )
     return resp.data
 
 # --- Gerenciamento de Dados Históricos ---
 @app.get("/api/collections")
 async def list_collections(user: UserProfile = Depends(require_page_access('collections'))):
-    response = supabase.table('coletas').select('*').order('iniciada_em', desc=True).execute()
+    response = await asyncio.to_thread(
+        supabase.table('coletas').select('*').order('iniciada_em', desc=True).execute
+    )
     return response.data
 
 @app.get("/api/collections/{collection_id}/details")
 async def get_collection_details(collection_id: int, user: UserProfile = Depends(require_page_access('collections'))):
-    response = supabase.rpc('get_collection_details', {'p_coleta_id': collection_id}).execute()
+    response = await asyncio.to_thread(
+        lambda: supabase.rpc('get_collection_details', {'p_coleta_id': collection_id}).execute()
+    )
     return response.data
 
 @app.delete("/api/collections/{collection_id}", status_code=204)
 async def delete_collection(collection_id: int, user: UserProfile = Depends(require_page_access('collections'))):
-    supabase.table('coletas').delete().eq('id', collection_id).execute()
+    await asyncio.to_thread(
+        lambda: supabase.table('coletas').delete().eq('id', collection_id).execute()
+    )
     return
 
 @app.post("/api/prune-by-collections")
 async def prune_by_collections(request: PruneByCollectionsRequest, user: UserProfile = Depends(require_page_access('prune'))):
     if not request.collection_ids:
         raise HTTPException(status_code=400, detail="Pelo menos uma coleta deve ser selecionada.")
-    response = supabase.table('produtos').delete().eq('cnpj_supermercado', request.cnpj).in_('coleta_id', request.collection_ids).execute()
-    deleted_count = len(response.data)
+    response = await asyncio.to_thread(
+        lambda: supabase.table('produtos').delete().eq('cnpj_supermercado', request.cnpj).in_('coleta_id', request.collection_ids).execute()
+    )
+    deleted_count = len(response.data) if response.data else 0
     logging.info(f"Limpeza de dados: {deleted_count} registros apagados para o CNPJ {request.cnpj} das coletas {request.collection_ids}.")
     return {"message": "Operação de limpeza concluída com sucesso.", "deleted_count": deleted_count}
 
 @app.get("/api/collections-by-market/{cnpj}")
 async def get_collections_by_market(cnpj: str, user: UserProfile = Depends(require_page_access('prune'))):
-    response = supabase.rpc('get_collections_for_market', {'market_cnpj': cnpj}).execute()
+    response = await asyncio.to_thread(
+        lambda: supabase.rpc('get_collections_for_market', {'market_cnpj': cnpj}).execute()
+    )
     return response.data
 
 # --- LOGS DE USUÁRIOS CORRIGIDOS ---
@@ -624,7 +690,9 @@ async def get_user_logs(
         if action_type:
             query = query.eq('action_type', action_type)
         
-        response = query.order('created_at', desc=True).range(start_index, end_index).execute()
+        response = await asyncio.to_thread(
+            query.order('created_at', desc=True).range(start_index, end_index).execute
+        )
         
         user_logs = []
         for log in response.data:
@@ -654,7 +722,9 @@ async def get_user_logs(
 @app.delete("/api/user-logs/{log_id}")
 async def delete_single_log(log_id: int, user: UserProfile = Depends(require_page_access('user_logs'))):
     try:
-        response = supabase.table('log_de_usuarios').delete().eq('id', log_id).execute()
+        response = await asyncio.to_thread(
+            lambda: supabase.table('log_de_usuarios').delete().eq('id', log_id).execute()
+        )
         deleted_count = len(response.data) if response.data else 0
         return {"message": "Log excluído com sucesso", "deleted_count": deleted_count}
     except Exception as e:
@@ -675,7 +745,9 @@ async def delete_user_logs(
         if date:
             query = query.gte('created_at', f'{date}T00:00:00').lte('created_at', f'{date}T23:59:59')
         
-        response = query.execute()
+        response = await asyncio.to_thread(
+            query.execute
+        )
         deleted_count = len(response.data) if response.data else 0
         return {"message": "Logs excluídos com sucesso", "deleted_count": deleted_count}
     except Exception as e:
@@ -702,7 +774,9 @@ async def export_user_logs(
         if action_type:
             query = query.eq('action_type', action_type)
         
-        response = query.order('created_at', desc=True).execute()
+        response = await asyncio.to_thread(
+            query.order('created_at', desc=True).execute
+        )
         
         if not response.data:
             raise HTTPException(status_code=404, detail="Nenhum log encontrado para exportação")
@@ -746,7 +820,9 @@ async def delete_logs_by_date(
         raise HTTPException(status_code=400, detail="Data é obrigatória para esta operação.")
         
     try:
-        response = supabase.table('log_de_usuarios').delete().lte('created_at', request.date.isoformat()).execute()
+        response = await asyncio.to_thread(
+            lambda: supabase.table('log_de_usuarios').delete().lte('created_at', request.date.isoformat()).execute()
+        )
         deleted_count = len(response.data) if response.data else 0
         return {"message": f"Logs até a data {request.date.isoformat()} deletados com sucesso.", "deleted_count": deleted_count}
     except Exception as e:
@@ -784,24 +860,30 @@ async def get_usage_statistics(
     user: UserProfile = Depends(require_page_access('user_logs'))
 ):
     try:
-        page_stats_response = supabase_admin.table('log_de_usuarios') \
-            .select('page_accessed', count='exact') \
-            .eq('action_type', 'access') \
-            .gte('created_at', str(start_date)) \
-            .lte('created_at', f'{end_date} 23:59:59') \
-            .execute()
+        page_stats_response = await asyncio.to_thread(
+            lambda: supabase_admin.table('log_de_usuarios') \
+                .select('page_accessed', count='exact') \
+                .eq('action_type', 'access') \
+                .gte('created_at', str(start_date)) \
+                .lte('created_at', f'{end_date} 23:59:59') \
+                .execute()
+        )
         
-        active_users_response = supabase_admin.table('log_de_usuarios') \
-            .select('user_id', count='exact') \
-            .gte('created_at', str(start_date)) \
-            .lte('created_at', f'{end_date} 23:59:59') \
-            .execute()
+        active_users_response = await asyncio.to_thread(
+            lambda: supabase_admin.table('log_de_usuarios') \
+                .select('user_id', count='exact') \
+                .gte('created_at', str(start_date)) \
+                .lte('created_at', f'{end_date} 23:59:59') \
+                .execute()
+        )
         
-        top_actions_response = supabase_admin.table('log_de_usuarios') \
-            .select('action_type', count='exact') \
-            .gte('created_at', str(start_date)) \
-            .lte('created_at', f'{end_date} 23:59:59') \
-            .execute()
+        top_actions_response = await asyncio.to_thread(
+            lambda: supabase_admin.table('log_de_usuarios') \
+                .select('action_type', count='exact') \
+                .gte('created_at', str(start_date)) \
+                .lte('created_at', f'{end_date} 23:59:59') \
+                .execute()
+        )
         
         statistics = {
             "period": {
@@ -824,7 +906,9 @@ async def get_usage_statistics(
 async def get_products_log(page: int = 1, page_size: int = 50, user: UserProfile = Depends(require_page_access('product_log'))):
     start_index = (page - 1) * page_size
     end_index = start_index + page_size - 1
-    response = supabase.table('produtos').select('*', count='exact').order('created_at', desc=True).range(start_index, end_index).execute()
+    response = await asyncio.to_thread(
+        supabase.table('produtos').select('*', count='exact').order('created_at', desc=True).range(start_index, end_index).execute
+    )
     return {"data": response.data, "total_count": response.count}
 
 @app.get("/api/search")
@@ -836,18 +920,28 @@ async def search_products(
 ):
     termo_busca = f"%{q.lower().strip()}%"
     query = supabase.table('produtos').select('*').ilike('nome_produto_normalizado', termo_busca)
-    if cnpjs: query = query.in_('cnpj_supermercado', cnpjs)
-    response = query.limit(500).execute()
+    if cnpjs: 
+        query = query.in_('cnpj_supermercado', cnpjs)
+    
+    response = await asyncio.to_thread(
+        query.limit(500).execute
+    )
     
     background_tasks.add_task(log_search, q, 'database', cnpjs, len(response.data), current_user)
     
-    if not response.data: return {"results": []}
+    if not response.data: 
+        return {"results": []}
+    
     df = pd.DataFrame(response.data)
     df['preco_produto'] = pd.to_numeric(df['preco_produto'], errors='coerce')
     df.dropna(subset=['preco_produto'], inplace=True)
+    
     if not df.empty:
         preco_medio = df['preco_produto'].mean()
-        df['status_preco'] = df['preco_produto'].apply(lambda x: 'Barato' if x < preco_medio * 0.9 else ('Caro' if x > preco_medio * 1.1 else 'Na Média'))
+        df['status_preco'] = df['preco_produto'].apply(
+            lambda x: 'Barato' if x < preco_medio * 0.9 else ('Caro' if x > preco_medio * 1.1 else 'Na Média')
+        )
+    
     df = df.sort_values(by='preco_produto', ascending=True)
     results = df.head(100).to_dict(orient='records')
     return {"results": results}
@@ -861,11 +955,24 @@ async def realtime_search(
     if not request.cnpjs: 
         raise HTTPException(status_code=400, detail="Pelo menos um CNPJ deve ser fornecido.")
     
-    resp = supabase.table('supermercados').select('cnpj, nome').in_('cnpj', request.cnpjs).execute()
+    resp = await asyncio.to_thread(
+        supabase.table('supermercados').select('cnpj, nome').in_('cnpj', request.cnpjs).execute
+    )
     mercados_map = {m['cnpj']: m['nome'] for m in resp.data}
-    tasks = [collector_service.consultar_produto(request.produto, {"cnpj": cnpj, "nome": mercados_map.get(cnpj, cnpj)}, datetime.now().isoformat(), ECONOMIZA_ALAGOAS_TOKEN, -1) for cnpj in request.cnpjs]
+    
+    tasks = [
+        collector_service.consultar_produto(
+            request.produto, 
+            {"cnpj": cnpj, "nome": mercados_map.get(cnpj, cnpj)}, 
+            datetime.now().isoformat(), 
+            ECONOMIZA_ALAGOAS_TOKEN, 
+            -1
+        ) for cnpj in request.cnpjs
+    ]
+    
     resultados_por_mercado = await asyncio.gather(*tasks, return_exceptions=True)
     resultados_finais = []
+    
     for i, resultado in enumerate(resultados_por_mercado):
         if isinstance(resultado, Exception):
             cnpj_com_erro = request.cnpjs[i]
@@ -879,33 +986,51 @@ async def realtime_search(
 
 @app.post("/api/price-history")
 async def get_price_history(request: PriceHistoryRequest, user: UserProfile = Depends(require_page_access('compare'))):
-    if not request.cnpjs: raise HTTPException(status_code=400, detail="Pelo menos dois mercados devem ser selecionados.")
-    if (request.end_date - request.start_date).days > 30: raise HTTPException(status_code=400, detail="O período não pode exceder 30 dias.")
+    if not request.cnpjs: 
+        raise HTTPException(status_code=400, detail="Pelo menos dois mercados devem ser selecionados.")
+    if (request.end_date - request.start_date).days > 30: 
+        raise HTTPException(status_code=400, detail="O período não pode exceder 30 dias.")
+    
     query = supabase.table('produtos').select('nome_supermercado, preco_produto, data_ultima_venda').in_('cnpj_supermercado', request.cnpjs).gte('data_ultima_venda', str(request.start_date)).lte('data_ultima_venda', str(request.end_date))
+    
     if request.product_identifier.isdigit() and len(request.product_identifier) > 7:
         query = query.eq('codigo_barras', request.product_identifier)
     else:
         query = query.like('nome_produto_normalizado', f"%{request.product_identifier.lower()}%")
-    response = query.execute()
-    if not response.data: return {}
+    
+    response = await asyncio.to_thread(
+        query.execute
+    )
+    
+    if not response.data: 
+        return {}
+    
     df = pd.DataFrame(response.data)
     df['preco_produto'] = pd.to_numeric(df['preco_produto'], errors='coerce')
     df.dropna(subset=['preco_produto', 'data_ultima_venda'], inplace=True)
     df['data_ultima_venda'] = pd.to_datetime(df['data_ultima_venda']).dt.date
+    
     pivot_df = df.pivot_table(index='data_ultima_venda', columns='nome_supermercado', values='preco_produto', aggfunc='min')
     pivot_df.index = pd.to_datetime(pivot_df.index)
     pivot_df = pivot_df.resample('D').mean().interpolate(method='linear')
+    
     history_by_market = {}
     for market_name in pivot_df.columns:
         market_series = pivot_df[market_name].dropna()
         history_by_market[market_name] = [{'x': index.strftime('%Y-%m-%d'), 'y': round(value, 2)} for index, value in market_series.items()]
+    
     return history_by_market
 
 @app.get("/api/dashboard/summary")
 async def get_dashboard_summary(start_date: date, end_date: date, cnpjs: Optional[List[str]] = Query(None), user: UserProfile = Depends(get_current_user)):
     params = {'start_date': str(start_date), 'end_date': str(end_date)}
-    if cnpjs: params['market_cnpjs'] = cnpjs
-    response = supabase.rpc('get_dashboard_summary', params).execute()
+    if cnpjs: 
+        params['market_cnpjs'] = cnpjs
+    
+    response = await asyncio.to_thread(
+        lambda: supabase.rpc('get_dashboard_summary', params).execute()
+    )
+    
     if not response.data:
         return {"total_mercados": 0, "total_produtos": 0, "total_coletas": 0, "ultima_coleta": None}
     return response.data[0]
@@ -913,29 +1038,55 @@ async def get_dashboard_summary(start_date: date, end_date: date, cnpjs: Optiona
 @app.get("/api/dashboard/stats")
 async def get_dashboard_stats(start_date: date, end_date: date, cnpjs: Optional[List[str]] = Query(None), user: UserProfile = Depends(require_page_access('dashboard'))):
     params = {'start_date': str(start_date), 'end_date': str(end_date)}
-    if cnpjs: params['market_cnpjs'] = cnpjs
-    top_products_resp = supabase.rpc('get_top_products_by_filters', params).execute()
-    top_markets_resp = supabase.rpc('get_top_markets_by_filters', params).execute()
+    if cnpjs: 
+        params['market_cnpjs'] = cnpjs
+    
+    top_products_resp = await asyncio.to_thread(
+        lambda: supabase.rpc('get_top_products_by_filters', params).execute()
+    )
+    top_markets_resp = await asyncio.to_thread(
+        lambda: supabase.rpc('get_top_markets_by_filters', params).execute()
+    )
+    
     return {"top_products": top_products_resp.data or [], "top_markets": top_markets_resp.data or []}
 
 @app.get("/api/dashboard/bargains")
 async def get_dashboard_bargains(start_date: date, end_date: date, cnpjs: Optional[List[str]] = Query(None), category: Optional[str] = Query(None), user: UserProfile = Depends(require_page_access('dashboard'))):
     params = {'start_date': str(start_date), 'end_date': str(end_date)}
-    if cnpjs: params['market_cnpjs'] = cnpjs
-    response = supabase.rpc('get_cheapest_products_by_barcode', params).execute()
-    if not response.data: return []
-    if not category or category == 'Todos': return response.data
-    category_rules_resp = supabase.table('categorias').select('palavras_chave, regra_unidade').eq('nome', category).single().execute()
-    if not category_rules_resp.data: return []
+    if cnpjs: 
+        params['market_cnpjs'] = cnpjs
+    
+    response = await asyncio.to_thread(
+        lambda: supabase.rpc('get_cheapest_products_by_barcode', params).execute()
+    )
+    
+    if not response.data: 
+        return []
+    
+    if not category or category == 'Todos': 
+        return response.data
+    
+    category_rules_resp = await asyncio.to_thread(
+        supabase.table('categorias').select('palavras_chave, regra_unidade').eq('nome', category).single().execute
+    )
+    
+    if not category_rules_resp.data: 
+        return []
+    
     category_rules = category_rules_resp.data
     df = pd.DataFrame(response.data)
     keywords = category_rules.get('palavras_chave', [])
-    if not keywords: return response.data
+    
+    if not keywords: 
+        return response.data
+    
     regex_pattern = '|'.join(keywords)
+    
     if category_rules.get('regra_unidade') == 'KG':
         filtered_df = df[df['nome_produto'].str.contains(regex_pattern, case=False, na=False) & (df['tipo_unidade'] == 'KG')]
     else:
         filtered_df = df[df['nome_produto'].str.contains(regex_pattern, case=False, na=False)]
+    
     return filtered_df.to_dict(orient='records')
     
 # --- Servir o Frontend ---
