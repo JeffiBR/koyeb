@@ -47,12 +47,15 @@ document.addEventListener('DOMContentLoaded', () => {
             tableBody.innerHTML = '';
             users.forEach(user => {
                 const row = document.createElement('tr');
-                // Salva os dados completos no elemento para fácil acesso ao editar
                 row.dataset.user = JSON.stringify(user);
 
                 row.innerHTML = `
                     <td>${user.full_name || 'N/A'}</td>
                     <td>${user.email || 'N/A'}</td>
+                    <td class="password-cell">
+                        ${user.plain_password ? `<span class="pwd-hidden">••••••••</span><span class="pwd-real" style="display:none;">${user.plain_password}</span>` : '<span class="pwd-hidden">Oculto</span>'}
+                        ${user.plain_password ? '<button class="btn-icon reveal-pwd" title="Revelar senha"><i class="fas fa-eye"></i></button>' : ''}
+                    </td>
                     <td>${user.role === 'admin' ? 'Admin Geral' : 'Usuário'}</td>
                     <td>${(user.allowed_pages || []).length} permissões</td>
                     <td class="actions">
@@ -91,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
         emailInput.disabled = true;
         passwordInput.value = '';
         passwordInput.placeholder = 'Deixe em branco para não alterar';
-        passwordInput.disabled = true; // Senha não é editada aqui por segurança
+        passwordInput.disabled = true;
         roleSelect.value = user.role;
         
         setSelectedPermissions(user.allowed_pages || []);
@@ -187,6 +190,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const user = JSON.parse(deleteButton.closest('tr').dataset.user);
             deleteUser(user.id, user.full_name);
         }
+
+        const revealBtn = e.target.closest('.reveal-pwd');
+        if (revealBtn) {
+            const cell = revealBtn.closest('.password-cell');
+            const hiddenSpan = cell.querySelector('.pwd-hidden');
+            const realSpan = cell.querySelector('.pwd-real');
+
+            if (!realSpan) return;
+
+            const isShown = realSpan.style.display === 'inline' || realSpan.style.display === 'block';
+            if (isShown) {
+                realSpan.style.display = 'none';
+                hiddenSpan.style.display = 'inline';
+                revealBtn.innerHTML = '<i class="fas fa-eye"></i>';
+            } else {
+                realSpan.style.display = 'inline';
+                hiddenSpan.style.display = 'none';
+                revealBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+            }
+        }
     });
     
     saveButton.addEventListener('click', saveUser);
@@ -224,7 +247,6 @@ document.addEventListener('DOMContentLoaded', () => {
             userDropdown.classList.toggle('show');
         });
         
-        // Fechar o dropdown ao clicar fora
         document.addEventListener('click', () => {
             userDropdown.classList.remove('show');
         });
@@ -253,7 +275,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            // Aqui você deve implementar a lógica de logout
             alert('Logout realizado com sucesso!');
             window.location.href = '/login.html';
         });
