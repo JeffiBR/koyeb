@@ -1,3 +1,5 @@
+// profile.js - Completo e corrigido
+
 document.addEventListener('DOMContentLoaded', () => {
     // --- ELEMENTOS DA UI ---
     const fullNameInput = document.getElementById('fullName');
@@ -48,12 +50,25 @@ document.addEventListener('DOMContentLoaded', () => {
      * Atualiza a visualização do avatar
      */
     const updateAvatarDisplay = (avatarUrl) => {
-        const timestamp = Date.now();
-        const avatarSrc = avatarUrl ? `${avatarUrl}?t=${timestamp}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(fullNameInput.value || 'U')}`;
-        
-        currentAvatar.src = avatarSrc;
-        if (userAvatar) {
-            userAvatar.src = avatarSrc;
+        if (avatarUrl) {
+            // Adiciona timestamp para evitar cache
+            const timestamp = Date.now();
+            const avatarSrc = `${avatarUrl}?t=${timestamp}`;
+            
+            currentAvatar.src = avatarSrc;
+            if (userAvatar) {
+                userAvatar.src = avatarSrc;
+            }
+        } else {
+            // Avatar padrão baseado no nome
+            const userName = fullNameInput.value || 'Usuário';
+            const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=random&color=fff&bold=true`;
+            
+            currentAvatar.src = defaultAvatar;
+            if (userAvatar) {
+                userAvatar.src = defaultAvatar;
+            }
         }
         
         // Habilita/desabilita botão de remover
@@ -68,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const hasPersonalInfoChanged = 
             fullNameInput.value !== originalProfileData.full_name ||
-            jobTitleInput.value !== originalProfileData.job_title;
+            jobTitleInput.value !== (originalProfileData.job_title || '');
 
         const hasEmailChanged = emailInput.value !== originalProfileData.email;
 
@@ -107,8 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
         discardChangesBtn.style.display = 'none';
         updateProfileBtn.disabled = false;
         
-        uploadStatus.textContent = '';
-        uploadStatus.className = 'status-message';
+        showStatus('', '');
     };
 
     /**
@@ -143,9 +157,18 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * Exibe mensagens de status
      */
-    const showStatus = (message, type = 'info') => {
+    const showStatus = (message, type = '') => {
         uploadStatus.textContent = message;
         uploadStatus.className = `status-message ${type}`;
+        
+        // Limpar mensagem após 5 segundos se for sucesso
+        if (type === 'success') {
+            setTimeout(() => {
+                if (uploadStatus.textContent === message) {
+                    showStatus('', '');
+                }
+            }, 5000);
+        }
     };
 
     /**
@@ -199,37 +222,48 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * Processa o upload da foto de perfil
      */
-    const handleAvatarUpload = async (session) => {
+    const handleAvatarUpload = async () => {
         const file = avatarFileInput.files[0];
-        if (!file) return currentUserProfile?.avatar_url;
+        if (!file) return null;
 
         showStatus('Enviando foto...', 'info');
 
-        const fileExt = file.name.split('.').pop();
-        const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
+        try {
+            const session = await getSession();
+            if (!session) {
+                throw new Error('Sessão não encontrada.');
+            }
 
-        const { data: uploadData, error: uploadError } = await supabase
-            .storage
-            .from('avatars')
-            .upload(filePath, file, { upsert: true });
+            const fileExt = file.name.split('.').pop();
+            const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
 
-        if (uploadError) {
-            throw uploadError;
+            const { data: uploadData, error: uploadError } = await supabase
+                .storage
+                .from('avatars')
+                .upload(filePath, file, { upsert: true });
+
+            if (uploadError) {
+                throw uploadError;
+            }
+
+            const { data: urlData } = supabase
+                .storage
+                .from('avatars')
+                .getPublicUrl(uploadData.path);
+
+            showStatus('Foto enviada com sucesso!', 'success');
+            return urlData.publicUrl;
+
+        } catch (error) {
+            console.error('Erro no upload:', error);
+            throw new Error(`Falha no upload: ${error.message}`);
         }
-
-        const { data: urlData } = supabase
-            .storage
-            .from('avatars')
-            .getPublicUrl(uploadData.path);
-
-        showStatus('Foto enviada com sucesso!', 'success');
-        return urlData.publicUrl;
     };
 
     /**
      * Remove a foto de perfil atual
      */
-    const removeCurrentAvatar = async (session) => {
+    const removeCurrentAvatar = async () => {
         if (!currentUserProfile?.avatar_url) return null;
 
         try {
@@ -246,64 +280,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (error) {
                 console.warn('Não foi possível remover o arquivo antigo:', error);
             }
+
+            return null;
         } catch (error) {
             console.warn('Erro ao tentar remover avatar antigo:', error);
+            return null;
         }
-
-        return null;
-    };
-
-    /**
-     * Atualiza o e-mail do usuário
-     */
-    const updateUserEmail = async (session, newEmail) => {
-        if (newEmail === currentUserProfile.email) return;
-
-        const { error } = await supabase.auth.updateUser({
-            email: newEmail
-        });
-
-        if (error) throw error;
-
-        // Note: O Supabase enviará um e-mail de confirmação para o novo e-mail
-        showStatus('E-mail alterado. Verifique seu novo e-mail para confirmar a alteração.', 'info');
-    };
-
-    /**
-     * Atualiza a senha do usuário
-     */
-    const updateUserPassword = async (currentPassword, newPassword) => {
-        if (!newPassword) return;
-
-        // Para alterar a senha, precisamos reautenticar o usuário
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-            email: currentUserProfile.email,
-            password: currentPassword
-        });
-
-        if (signInError) {
-            throw new Error('Senha atual incorreta.');
-        }
-
-        const { error: updateError } = await supabase.auth.updateUser({
-            password: newPassword
-        });
-
-        if (updateError) throw updateError;
-
-        showStatus('Senha alterada com sucesso!', 'success');
     };
 
     /**
      * Lida com a atualização completa do perfil
      */
     const handleProfileUpdate = async () => {
-        const session = await getSession();
-        if (!session) {
-            showStatus('Sessão não encontrada. Faça o login.', 'error');
-            return;
-        }
-
         try {
             // Valida o formulário
             validateForm();
@@ -314,33 +302,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let avatarUrl = currentUserProfile?.avatar_url;
 
-            // Processa remoção do avatar
-            if (removeAvatarBtn.disabled === false && !avatarFileInput.files[0]) {
-                avatarUrl = await removeCurrentAvatar(session);
-            }
-
             // Processa upload de novo avatar
             if (avatarFileInput.files[0]) {
-                avatarUrl = await handleAvatarUpload(session);
+                avatarUrl = await handleAvatarUpload();
             }
 
-            // Atualiza e-mail se necessário
-            if (emailInput.value !== currentUserProfile.email) {
-                await updateUserEmail(session, emailInput.value);
+            // Processa remoção do avatar se solicitado
+            if (removeAvatarBtn.disabled === false && !avatarFileInput.files[0]) {
+                avatarUrl = await removeCurrentAvatar();
             }
 
-            // Atualiza senha se fornecida
-            if (newPasswordInput.value) {
-                await updateUserPassword(currentPasswordInput.value, newPasswordInput.value);
-            }
-
-            // Atualiza perfil no banco de dados
+            // Prepara os dados para envio
             const updateData = {
                 full_name: fullNameInput.value.trim(),
                 job_title: jobTitleInput.value.trim(),
-                avatar_url: avatarUrl
             };
 
+            // Inclui avatar_url apenas se definido
+            if (avatarUrl !== undefined) {
+                updateData.avatar_url = avatarUrl;
+            }
+
+            // Adiciona campos de email/senha apenas se fornecidos
+            if (emailInput.value !== currentUserProfile.email) {
+                updateData.email = emailInput.value;
+            }
+
+            if (newPasswordInput.value) {
+                updateData.new_password = newPasswordInput.value;
+                updateData.current_password = currentPasswordInput.value;
+            }
+
+            // Envia os dados para a API
             const response = await authenticatedFetch('/api/users/me', {
                 method: 'PUT',
                 headers: {
@@ -354,13 +347,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw errorData;
             }
 
+            const updatedProfile = await response.json();
             showStatus('Perfil atualizado com sucesso!', 'success');
             
-            // Atualiza a exibição
+            // Atualiza a exibição do avatar imediatamente
             updateAvatarDisplay(avatarUrl);
             
-            // Recarrega os dados para sincronizar
-            await loadProfile();
+            // Atualiza os dados locais
+            currentUserProfile = { ...currentUserProfile, ...updatedProfile };
+            originalProfileData = { ...currentUserProfile };
+
+            // Reseta o formulário de arquivo
+            avatarFileInput.value = '';
+            avatarPreview.style.display = 'none';
 
         } catch (error) {
             console.error('Erro ao atualizar perfil:', error);
@@ -381,6 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             updateProfileBtn.disabled = false;
             updateProfileBtn.innerHTML = '<i class="fas fa-save"></i><span>Salvar Todas as Alterações</span>';
+            checkForChanges();
         }
     };
 
@@ -411,10 +411,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Botão remover avatar
         removeAvatarBtn.addEventListener('click', () => {
-            avatarFileInput.value = '';
-            avatarPreview.style.display = 'none';
-            updateAvatarDisplay(null);
-            checkForChanges();
+            if (confirm('Tem certeza que deseja remover sua foto de perfil?')) {
+                avatarFileInput.value = '';
+                avatarPreview.style.display = 'none';
+                updateAvatarDisplay(null);
+                checkForChanges();
+                showStatus('Foto será removida ao salvar as alterações.', 'info');
+            }
         });
 
         // Botões de ação
