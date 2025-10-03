@@ -411,8 +411,7 @@ async def update_my_profile(profile_data: ProfileUpdateWithCredentials, current_
 
         # 3. Atualizar dados na tabela 'profiles' se houver algo para atualizar
         if profile_update_data:
-        response = await supabase.table('profiles').update(profile_update_data).eq('id', current_user.id).execute()
-
+            response = await supabase.table('profiles').update(profile_update_data).eq('id', current_user.id).execute()
             return response.data
 
         # 4. Se nada foi alterado em 'profiles', buscar e retornar o perfil atual para confirmar o sucesso
@@ -949,4 +948,3 @@ app.mount("/", StaticFiles(directory="web", html=True), name="static")
 @app.get("/")
 def read_root():
     return {"message": "Bem-vindo à API de Preços AL - Versão 3.1.2"}
-
