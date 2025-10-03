@@ -306,8 +306,39 @@ async def update_user(user_id: str, user_data: UserUpdate, admin_user: UserProfi
         
 @app.get("/api/users")
 async def list_users(admin_user: UserProfile = Depends(require_page_access('users'))):
-    response = supabase.table('profiles').select('id, full_name, role, allowed_pages, avatar_url').execute()
-    return response.data
+    try:
+        # Buscar perfis da tabela
+        profiles_response = supabase.table('profiles').select(
+            'id, full_name, role, allowed_pages, avatar_url'
+        ).execute()
+        profiles = profiles_response.data or []
+
+        users = []
+        for profile in profiles:
+            email = None
+            try:
+                # Buscar e-mail no Supabase Auth
+                auth_response = supabase_admin.auth.admin.get_user_by_id(profile['id'])
+                if auth_response.user:
+                    email = auth_response.user.email
+            except Exception as e:
+                logging.error(f"Erro ao buscar e-mail do usuário {profile['id']}: {e}")
+
+            users.append({
+                "id": profile["id"],
+                "full_name": profile.get("full_name"),
+                "role": profile.get("role"),
+                "allowed_pages": profile.get("allowed_pages"),
+                "avatar_url": profile.get("avatar_url"),
+                "email": email or "N/A"
+            })
+
+        return users
+
+    except Exception as e:
+        logging.error(f"Erro ao listar usuários: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno ao listar usuários")
+
 
 @app.delete("/api/users/{user_id}", status_code=204)
 async def delete_user(user_id: str, admin_user: UserProfile = Depends(require_page_access('users'))):
@@ -794,3 +825,4 @@ app.mount("/", StaticFiles(directory="web", html=True), name="static")
 @app.get("/")
 def read_root():
     return {"message": "Bem-vindo à API de Preços AL - Versão 3.1.2"}
+
