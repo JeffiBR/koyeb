@@ -2,30 +2,120 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ELEMENTOS DA UI ---
     const fullNameInput = document.getElementById('fullName');
     const jobTitleInput = document.getElementById('jobTitle');
+    const emailInput = document.getElementById('email');
+    const currentPasswordInput = document.getElementById('currentPassword');
+    const newPasswordInput = document.getElementById('newPassword');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
     const avatarFileInput = document.getElementById('avatarFile');
+    const currentAvatar = document.getElementById('currentAvatar');
+    const removeAvatarBtn = document.getElementById('removeAvatarBtn');
+    const avatarPreview = document.getElementById('avatarPreview');
+    const previewImage = document.getElementById('previewImage');
     const updateProfileBtn = document.getElementById('updateProfileBtn');
+    const discardChangesBtn = document.getElementById('discardChangesBtn');
     const uploadStatus = document.getElementById('uploadStatus');
-    // A imagem do avatar na barra superior
     const userAvatar = document.getElementById('userAvatar');
 
+    // Botões para mostrar/ocultar senha
+    const toggleCurrentPassword = document.getElementById('toggleCurrentPassword');
+    const toggleNewPassword = document.getElementById('toggleNewPassword');
+    const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
+
     let currentUserProfile = null;
+    let originalProfileData = null;
+    let hasUnsavedChanges = false;
 
     /**
-     * Função auxiliar para formatar o nome do campo (ex: full_name -> Full Name)
+     * Configura os toggles de visibilidade de senha
      */
-    const formatFieldName = (name) => {
-        if (!name) return 'Campo';
-        // Troca underscores por espaços e capitaliza cada palavra
-        return name.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    const setupPasswordToggles = () => {
+        const setupToggle = (toggleBtn, input) => {
+            toggleBtn.addEventListener('click', () => {
+                const type = input.type === 'password' ? 'text' : 'password';
+                input.type = type;
+                toggleBtn.innerHTML = type === 'password' ? 
+                    '<i class="fas fa-eye"></i>' : 
+                    '<i class="fas fa-eye-slash"></i>';
+            });
+        };
+
+        setupToggle(toggleCurrentPassword, currentPasswordInput);
+        setupToggle(toggleNewPassword, newPasswordInput);
+        setupToggle(toggleConfirmPassword, confirmPasswordInput);
     };
 
     /**
-     * Carrega os dados do perfil do usuário logado e preenche o formulário.
+     * Atualiza a visualização do avatar
+     */
+    const updateAvatarDisplay = (avatarUrl) => {
+        const timestamp = Date.now();
+        const avatarSrc = avatarUrl ? `${avatarUrl}?t=${timestamp}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(fullNameInput.value || 'U')}`;
+        
+        currentAvatar.src = avatarSrc;
+        if (userAvatar) {
+            userAvatar.src = avatarSrc;
+        }
+        
+        // Habilita/desabilita botão de remover
+        removeAvatarBtn.disabled = !avatarUrl;
+    };
+
+    /**
+     * Verifica se há alterações não salvas
+     */
+    const checkForChanges = () => {
+        if (!originalProfileData) return;
+
+        const hasPersonalInfoChanged = 
+            fullNameInput.value !== originalProfileData.full_name ||
+            jobTitleInput.value !== originalProfileData.job_title;
+
+        const hasEmailChanged = emailInput.value !== originalProfileData.email;
+
+        const hasPasswordChanged = 
+            newPasswordInput.value.trim() !== '' ||
+            confirmPasswordInput.value.trim() !== '';
+
+        const hasAvatarChanged = avatarFileInput.files.length > 0;
+
+        hasUnsavedChanges = hasPersonalInfoChanged || hasEmailChanged || hasPasswordChanged || hasAvatarChanged;
+        
+        discardChangesBtn.style.display = hasUnsavedChanges ? 'block' : 'none';
+        updateProfileBtn.disabled = !hasUnsavedChanges;
+    };
+
+    /**
+     * Restaura os dados originais
+     */
+    const discardChanges = () => {
+        if (!originalProfileData) return;
+
+        fullNameInput.value = originalProfileData.full_name || '';
+        jobTitleInput.value = originalProfileData.job_title || '';
+        emailInput.value = originalProfileData.email || '';
+        
+        currentPasswordInput.value = '';
+        newPasswordInput.value = '';
+        confirmPasswordInput.value = '';
+        
+        avatarFileInput.value = '';
+        avatarPreview.style.display = 'none';
+        
+        updateAvatarDisplay(originalProfileData.avatar_url);
+        
+        hasUnsavedChanges = false;
+        discardChangesBtn.style.display = 'none';
+        updateProfileBtn.disabled = false;
+        
+        uploadStatus.textContent = '';
+        uploadStatus.className = 'status-message';
+    };
+
+    /**
+     * Carrega os dados do perfil do usuário logado
      */
     const loadProfile = async () => {
         try {
-            // Usa a função centralizada do auth.js para uma chamada segura
-            // (Assume-se que 'authenticatedFetch' está definido em outro lugar)
             const response = await authenticatedFetch('/api/users/me');
 
             if (!response.ok) {
@@ -33,81 +123,224 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(err.detail || 'Não foi possível carregar o perfil.');
             }
 
-            // Armazena todos os dados do perfil, incluindo role e allowed_pages
-            currentUserProfile = await response.json(); 
+            currentUserProfile = await response.json();
+            originalProfileData = { ...currentUserProfile };
 
-            // Preenche o formulário com os dados existentes
+            // Preenche o formulário
             fullNameInput.value = currentUserProfile.full_name || '';
             jobTitleInput.value = currentUserProfile.job_title || '';
-            if (currentUserProfile.avatar_url && userAvatar) {
-                // Adiciona um timestamp para evitar cache em navegadores mais agressivos
-                userAvatar.src = `${currentUserProfile.avatar_url}?t=${Date.now()}`; 
-            }
+            emailInput.value = currentUserProfile.email || '';
+            
+            // Atualiza avatar
+            updateAvatarDisplay(currentUserProfile.avatar_url);
 
         } catch (error) {
             console.error('Erro ao carregar perfil:', error);
-            uploadStatus.textContent = error.message || 'Erro ao carregar perfil.';
-            uploadStatus.style.color = 'var(--error)';
+            showStatus(error.message || 'Erro ao carregar perfil.', 'error');
         }
     };
 
     /**
-     * Lida com o upload da foto e a atualização dos dados do perfil.
+     * Exibe mensagens de status
+     */
+    const showStatus = (message, type = 'info') => {
+        uploadStatus.textContent = message;
+        uploadStatus.className = `status-message ${type}`;
+    };
+
+    /**
+     * Valida os dados do formulário
+     */
+    const validateForm = () => {
+        // Validação básica
+        if (!fullNameInput.value.trim()) {
+            throw new Error('Nome completo é obrigatório.');
+        }
+
+        if (!emailInput.value.trim()) {
+            throw new Error('E-mail é obrigatório.');
+        }
+
+        // Validação de e-mail
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(emailInput.value)) {
+            throw new Error('Por favor, insira um e-mail válido.');
+        }
+
+        // Validação de senha
+        if (newPasswordInput.value || confirmPasswordInput.value) {
+            if (!currentPasswordInput.value) {
+                throw new Error('Senha atual é necessária para alterar a senha.');
+            }
+
+            if (newPasswordInput.value.length < 6) {
+                throw new Error('A nova senha deve ter pelo menos 6 caracteres.');
+            }
+
+            if (newPasswordInput.value !== confirmPasswordInput.value) {
+                throw new Error('As senhas não coincidem.');
+            }
+        }
+
+        // Validação do arquivo de avatar
+        const file = avatarFileInput.files[0];
+        if (file) {
+            if (file.size > 1 * 1024 * 1024) {
+                throw new Error('O arquivo da foto não pode exceder 1MB.');
+            }
+
+            const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+            if (!validTypes.includes(file.type)) {
+                throw new Error('Formato de arquivo não suportado. Use JPG, PNG ou GIF.');
+            }
+        }
+    };
+
+    /**
+     * Processa o upload da foto de perfil
+     */
+    const handleAvatarUpload = async (session) => {
+        const file = avatarFileInput.files[0];
+        if (!file) return currentUserProfile?.avatar_url;
+
+        showStatus('Enviando foto...', 'info');
+
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
+
+        const { data: uploadData, error: uploadError } = await supabase
+            .storage
+            .from('avatars')
+            .upload(filePath, file, { upsert: true });
+
+        if (uploadError) {
+            throw uploadError;
+        }
+
+        const { data: urlData } = supabase
+            .storage
+            .from('avatars')
+            .getPublicUrl(uploadData.path);
+
+        showStatus('Foto enviada com sucesso!', 'success');
+        return urlData.publicUrl;
+    };
+
+    /**
+     * Remove a foto de perfil atual
+     */
+    const removeCurrentAvatar = async (session) => {
+        if (!currentUserProfile?.avatar_url) return null;
+
+        try {
+            // Extrai o caminho do arquivo da URL
+            const url = new URL(currentUserProfile.avatar_url);
+            const pathParts = url.pathname.split('/');
+            const filePath = pathParts.slice(pathParts.indexOf('avatars') + 1).join('/');
+
+            const { error } = await supabase
+                .storage
+                .from('avatars')
+                .remove([filePath]);
+
+            if (error) {
+                console.warn('Não foi possível remover o arquivo antigo:', error);
+            }
+        } catch (error) {
+            console.warn('Erro ao tentar remover avatar antigo:', error);
+        }
+
+        return null;
+    };
+
+    /**
+     * Atualiza o e-mail do usuário
+     */
+    const updateUserEmail = async (session, newEmail) => {
+        if (newEmail === currentUserProfile.email) return;
+
+        const { error } = await supabase.auth.updateUser({
+            email: newEmail
+        });
+
+        if (error) throw error;
+
+        // Note: O Supabase enviará um e-mail de confirmação para o novo e-mail
+        showStatus('E-mail alterado. Verifique seu novo e-mail para confirmar a alteração.', 'info');
+    };
+
+    /**
+     * Atualiza a senha do usuário
+     */
+    const updateUserPassword = async (currentPassword, newPassword) => {
+        if (!newPassword) return;
+
+        // Para alterar a senha, precisamos reautenticar o usuário
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: currentUserProfile.email,
+            password: currentPassword
+        });
+
+        if (signInError) {
+            throw new Error('Senha atual incorreta.');
+        }
+
+        const { error: updateError } = await supabase.auth.updateUser({
+            password: newPassword
+        });
+
+        if (updateError) throw updateError;
+
+        showStatus('Senha alterada com sucesso!', 'success');
+    };
+
+    /**
+     * Lida com a atualização completa do perfil
      */
     const handleProfileUpdate = async () => {
-        // (Assume-se que 'getSession' está definido em outro lugar)
-        const session = await getSession(); 
+        const session = await getSession();
         if (!session) {
-            alert("Sessão não encontrada. Faça o login.");
+            showStatus('Sessão não encontrada. Faça o login.', 'error');
             return;
         }
 
-        updateProfileBtn.disabled = true;
-        updateProfileBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Salvando...</span>';
-        uploadStatus.textContent = '';
-        uploadStatus.style.color = ''; // Reseta a cor da mensagem
-
         try {
-            const file = avatarFileInput.files[0];
-            // Usa a URL existente (se o perfil foi carregado) ou null
-            let avatarUrl = currentUserProfile ? currentUserProfile.avatar_url : null; 
+            // Valida o formulário
+            validateForm();
 
-            // 1. Se um novo arquivo foi selecionado, faz o upload para o Supabase Storage
-            if (file) {
-                if (file.size > 1 * 1024 * 1024) { // Limite de 1MB
-                    throw new Error("O arquivo da foto não pode exceder 1MB.");
-                }
-                uploadStatus.textContent = 'Enviando foto...';
-                const fileExt = file.name.split('.').pop();
-                const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
+            updateProfileBtn.disabled = true;
+            updateProfileBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Salvando...</span>';
+            showStatus('Salvando alterações...', 'info');
 
-                // (Assume-se que 'supabase' está definido em outro lugar)
-                const { data: uploadData, error: uploadError } = await supabase
-                    .storage
-                    .from('avatars')
-                    .upload(filePath, file, { upsert: true }); // Usando upsert para garantir a substituição
+            let avatarUrl = currentUserProfile?.avatar_url;
 
-                if (uploadError) {
-                    throw uploadError;
-                }
-
-                const { data: urlData } = supabase
-                    .storage
-                    .from('avatars')
-                    .getPublicUrl(uploadData.path);
-                
-                avatarUrl = urlData.publicUrl;
-                uploadStatus.textContent = 'Foto enviada com sucesso!';
+            // Processa remoção do avatar
+            if (removeAvatarBtn.disabled === false && !avatarFileInput.files[0]) {
+                avatarUrl = await removeCurrentAvatar(session);
             }
 
-            // 2. Monta o corpo da requisição APENAS com os campos que o endpoint /api/users/me aceita.
+            // Processa upload de novo avatar
+            if (avatarFileInput.files[0]) {
+                avatarUrl = await handleAvatarUpload(session);
+            }
+
+            // Atualiza e-mail se necessário
+            if (emailInput.value !== currentUserProfile.email) {
+                await updateUserEmail(session, emailInput.value);
+            }
+
+            // Atualiza senha se fornecida
+            if (newPasswordInput.value) {
+                await updateUserPassword(currentPasswordInput.value, newPasswordInput.value);
+            }
+
+            // Atualiza perfil no banco de dados
             const updateData = {
                 full_name: fullNameInput.value.trim(),
                 job_title: jobTitleInput.value.trim(),
-                avatar_url: avatarUrl || null 
+                avatar_url: avatarUrl
             };
 
-            // 3. Envia os dados para a nossa API para salvar no banco
             const response = await authenticatedFetch('/api/users/me', {
                 method: 'PUT',
                 headers: {
@@ -116,56 +349,83 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(updateData)
             });
 
-            // Se a resposta da API não for 'ok', lança o corpo do erro (o JSON inteiro)
             if (!response.ok) {
                 const errorData = await response.json();
                 throw errorData;
             }
 
-            uploadStatus.textContent = 'Perfil atualizado com sucesso!';
-            uploadStatus.style.color = 'var(--success)';
+            showStatus('Perfil atualizado com sucesso!', 'success');
             
-            if (userAvatar && avatarUrl) {
-                // Força o recarregamento da nova imagem
-                userAvatar.src = `${avatarUrl}?t=${Date.now()}`; 
-            }
+            // Atualiza a exibição
+            updateAvatarDisplay(avatarUrl);
             
-            // Recarrega o perfil para sincronizar o estado e garantir que currentUserProfile tenha os dados mais recentes
-            await loadProfile(); 
+            // Recarrega os dados para sincronizar
+            await loadProfile();
 
         } catch (error) {
-            console.error('Erro detalhado ao atualizar perfil:', error);
-            let displayMessage;
-
-            // Caso 1: Erro de validação da sua API (FastAPI/Pydantic), que vem com um array em 'detail'.
-            if (error && Array.isArray(error.detail)) {
-                // Mapeia cada objeto de erro para uma mensagem clara, formatando o nome do campo
-                displayMessage = error.detail.map(err => {
-                    // Tenta obter o nome do campo (loc[1])
-                    const fieldName = formatFieldName(err.loc[1]); 
-                    // Junta o nome do campo e a mensagem de erro (ex: 'Full Name: Field required')
-                    return `${fieldName}: ${err.msg}`;
-                }).join('; ');
-            } 
-            // Caso 2: Erro do Supabase ou outro erro padrão que possui a propriedade 'message'.
-            else if (error && error.message) {
-                displayMessage = error.message;
-            } 
-            // Caso 3: Um erro inesperado que não se encaixa nos padrões acima.
-            else {
-                displayMessage = 'Ocorreu uma falha desconhecida.';
+            console.error('Erro ao atualizar perfil:', error);
+            
+            let displayMessage = error.message || 'Ocorreu um erro ao atualizar o perfil.';
+            
+            if (error.detail) {
+                if (Array.isArray(error.detail)) {
+                    displayMessage = error.detail.map(err => 
+                        `${err.loc?.[1] || 'Campo'}: ${err.msg}`
+                    ).join('; ');
+                } else {
+                    displayMessage = error.detail;
+                }
             }
 
-            uploadStatus.textContent = `Erro: ${displayMessage}`;
-            uploadStatus.style.color = 'var(--error)';
+            showStatus(`Erro: ${displayMessage}`, 'error');
         } finally {
             updateProfileBtn.disabled = false;
-            updateProfileBtn.innerHTML = '<i class="fas fa-save"></i><span>Salvar Alterações</span>';
+            updateProfileBtn.innerHTML = '<i class="fas fa-save"></i><span>Salvar Todas as Alterações</span>';
         }
     };
 
-    updateProfileBtn.addEventListener('click', handleProfileUpdate);
+    /**
+     * Inicializa os event listeners
+     */
+    const initializeEventListeners = () => {
+        // Event listeners para inputs
+        [fullNameInput, jobTitleInput, emailInput, currentPasswordInput, newPasswordInput, confirmPasswordInput].forEach(input => {
+            input.addEventListener('input', checkForChanges);
+        });
 
-    // Carrega os dados do perfil assim que a página é aberta
+        // Avatar file input
+        avatarFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImage.src = e.target.result;
+                    avatarPreview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                avatarPreview.style.display = 'none';
+            }
+            checkForChanges();
+        });
+
+        // Botão remover avatar
+        removeAvatarBtn.addEventListener('click', () => {
+            avatarFileInput.value = '';
+            avatarPreview.style.display = 'none';
+            updateAvatarDisplay(null);
+            checkForChanges();
+        });
+
+        // Botões de ação
+        updateProfileBtn.addEventListener('click', handleProfileUpdate);
+        discardChangesBtn.addEventListener('click', discardChanges);
+
+        // Configura toggles de senha
+        setupPasswordToggles();
+    };
+
+    // Inicialização
+    initializeEventListeners();
     loadProfile();
 });
