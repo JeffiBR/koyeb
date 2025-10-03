@@ -1,14 +1,13 @@
-// web/auth.js
+// auth.js - VERSÃO FINAL
 
 const SUPABASE_URL = 'https://zhaetrzpkkgzfrwxfqdw.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpoYWV0cnpwa2tnemZyd3hmcWR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0MjM3MzksImV4cCI6MjA3Mjk5OTczOX0.UHoWWZahvp_lMDH8pK539YIAFTAUnQk9mBX5tdixwN0';
 
-const supabase = self.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-let currentUserProfile = null;
+const supabase = self.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY );
+let currentUserProfile = null; // Variável de cache em memória
 
 /**
  * Função centralizada para requisições autenticadas.
- * Ela cuida de obter o token e adicioná-lo aos cabeçalhos.
  */
 async function authenticatedFetch(url, options = {}) {
     const session = await getSession();
@@ -16,7 +15,6 @@ async function authenticatedFetch(url, options = {}) {
     if (!session) {
         alert("Sua sessão expirou ou é inválida. Por favor, faça login novamente.");
         window.location.href = '/login.html';
-        // Lança um erro para interromper a execução da função que a chamou
         throw new Error("Sessão não encontrada.");
     }
 
@@ -25,54 +23,71 @@ async function authenticatedFetch(url, options = {}) {
         'Authorization': `Bearer ${session.access_token}`
     };
 
-    const finalOptions = {
-        ...options,
-        headers: {
-            ...defaultHeaders,
-            ...options.headers,
-        }
-    };
-
+    const finalOptions = { ...options, headers: { ...defaultHeaders, ...options.headers } };
     return fetch(url, finalOptions);
 }
 
-// --- O resto do arquivo auth.js (funções de suporte) ---
-
+/**
+ * Busca o usuário autenticado no Supabase.
+ */
 async function getAuthUser() {
     const { data: { user } } = await supabase.auth.getUser();
     return user;
 }
 
+/**
+ * Busca o perfil do usuário. Usa um cache em memória para evitar requisições repetidas.
+ */
 async function fetchUserProfile() {
-    if (currentUserProfile) return currentUserProfile;
+    // Se já temos o perfil em cache, retorna ele imediatamente.
+    if (currentUserProfile) {
+        console.log('👤 Usando perfil do cache em memória (auth.js)');
+        return currentUserProfile;
+    }
+    
     const session = await getSession();
     if (!session) return null;
+
     try {
-        // Usa a própria authenticatedFetch para buscar o perfil
+        console.log('🌐 Buscando perfil do servidor (/api/users/me)');
         const response = await authenticatedFetch('/api/users/me');
         if (!response.ok) {
-            if (response.status === 401 || response.status === 404) { await signOut(); return null; }
-            throw new Error('Falha ao buscar perfil.');
+            if (response.status === 401 || response.status === 404) {
+                await signOut();
+                return null;
+            }
+            throw new Error('Falha ao buscar perfil do usuário.');
         }
+        // Salva o perfil no cache em memória para futuras chamadas
         currentUserProfile = await response.json();
         return currentUserProfile;
     } catch (error) {
-        console.error("Erro ao buscar perfil do usuário:", error);
+        console.error("Erro em fetchUserProfile:", error);
         return null;
     }
 }
 
+/**
+ * Obtém a sessão atual do Supabase.
+ */
 async function getSession() {
     const { data: { session } } = await supabase.auth.getSession();
     return session;
 }
 
+/**
+ * Realiza o logout do usuário.
+ */
 async function signOut() {
     await supabase.auth.signOut();
-    currentUserProfile = null;
+    clearUserProfileCache(); // Limpa o cache ao sair
+    localStorage.removeItem('currentUser');
     window.location.href = '/login.html';
 }
 
+/**
+ * Protege rotas que exigem login e permissões específicas.
+ */
 async function routeGuard(requiredPermission = null) {
     const user = await getAuthUser();
     if (!user) {
@@ -88,33 +103,16 @@ async function routeGuard(requiredPermission = null) {
     }
 }
 
-async function updateUIVisibility() {
-    const profile = await fetchUserProfile();
-    const userProfileMenu = document.getElementById('userProfileMenu');
-    const navLinks = document.querySelectorAll('.sidebar-nav [data-permission]');
-    
-    if (profile) {
-        if (userProfileMenu) {
-            userProfileMenu.style.display = 'flex';
-            const userName = document.getElementById('userName');
-            const userAvatar = document.getElementById('userAvatar');
-            if(userName) userName.textContent = profile.full_name || 'Usuário';
-            if(userAvatar && profile.avatar_url) userAvatar.src = profile.avatar_url;
-        }
-        navLinks.forEach(link => {
-            const permission = link.getAttribute('data-permission');
-            if (profile.role === 'admin' || (profile.allowed_pages && profile.allowed_pages.includes(permission))) {
-                link.style.display = 'list-item';
-            } else {
-                link.style.display = 'none';
-            }
-        });
-    } else {
-        if (userProfileMenu) userProfileMenu.style.display = 'none';
-        navLinks.forEach(link => link.style.display = 'none');
-    }
+// ==================================================================
+// --- FUNÇÃO ADICIONADA PARA LIMPEZA DE CACHE ---
+/**
+ * Limpa a variável de cache do perfil do usuário (currentUserProfile).
+ * Isso força a próxima chamada a fetchUserProfile a buscar dados frescos do servidor.
+ */
+function clearUserProfileCache() {
+    console.log('🧹 Cache de perfil em memória (auth.js) limpo.');
+    currentUserProfile = null;
 }
+// ==================================================================
 
-document.addEventListener('DOMContentLoaded', () => {
-    // ... (código de eventos como logout, menu mobile e tema)
-});
+// A função updateUIVisibility foi removida pois sua lógica agora está centralizada no user-menu.js
