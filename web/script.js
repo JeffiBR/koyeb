@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ESTADO DA APLICAÇÃO ---
     let currentResults = [];
     let allMarkets = [];
+    let marketMap = {}; // Mapa para associar CNPJ com dados do mercado (nome e endereço)
 
     // --- FUNÇÕES DE UI E RENDERIZAÇÃO ---
     const showLoader = (show) => {
@@ -55,63 +56,67 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectionCountSpan) selectionCountSpan.textContent = `${selected} selecionados`;
     };
 
-   const buildProductCard = (item, allItemsInResult) => {
-    const price = typeof item.preco_produto === 'number' 
-        ? `R$ ${item.preco_produto.toFixed(2).replace('.', ',')}` 
-        : 'N/A';
+    const buildProductCard = (item, allItemsInResult) => {
+        const price = typeof item.preco_produto === 'number' 
+            ? `R$ ${item.preco_produto.toFixed(2).replace('.', ',')}` 
+            : 'N/A';
 
-    const date = item.data_ultima_venda 
-        ? new Date(item.data_ultima_venda).toLocaleDateString('pt-BR') 
-        : 'N/A';
+        const date = item.data_ultima_venda 
+            ? new Date(item.data_ultima_venda).toLocaleDateString('pt-BR') 
+            : 'N/A';
 
-    // --- LÓGICA CORRIGIDA PARA ACESSAR O ENDEREÇO ---
-    // O endereço agora vem de um objeto aninhado 'supermercados'
-    const address = item.supermercados && item.supermercados.endereco 
-        ? item.supermercados.endereco 
-        : 'Endereço não disponível';
+        // --- LÓGICA CORRIGIDA PARA ACESSAR O ENDEREÇO ---
+        // Busca os dados do mercado no marketMap usando o CNPJ do produto
+        const marketData = marketMap[item.cnpj_supermercado];
+        const address = marketData && marketData.endereco 
+            ? marketData.endereco 
+            : 'Endereço não disponível';
 
-    const prices = allItemsInResult.map(r => r.preco_produto).filter(p => typeof p === 'number');
-    const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-    const isCheapest = prices.length > 1 && item.preco_produto === minPrice;
+        const marketName = marketData && marketData.nome 
+            ? marketData.nome 
+            : (item.nome_supermercado || 'Supermercado');
 
-    // Nova estrutura HTML do Card, mais alinhada com o style.css
-    return `
-    <div class="product-card-v2" data-cheapest="${isCheapest}">
-        <div class="card-v2-header">
-            <h3 class="product-v2-name">${item.nome_produto || 'Produto sem nome'}</h3>
-            <div class="product-v2-price">${price}</div>
-        </div>
+        const prices = allItemsInResult.map(r => r.preco_produto).filter(p => typeof p === 'number');
+        const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+        const isCheapest = prices.length > 1 && item.preco_produto === minPrice;
 
-        <div class="card-v2-body">
-            <div class="detail-v2-item">
-                <i class="fas fa-store detail-v2-icon"></i>
-                <div class="detail-v2-text">
-                    <span class="detail-v2-title">${item.nome_supermercado || 'Supermercado'}</span>
-                    <span class="detail-v2-subtitle">${address}</span>
+        return `
+        <div class="product-card-v2" data-cheapest="${isCheapest}">
+            <div class="card-v2-header">
+                <h3 class="product-v2-name">${item.nome_produto || 'Produto sem nome'}</h3>
+                <div class="product-v2-price">${price}</div>
+            </div>
+
+            <div class="card-v2-body">
+                <div class="detail-v2-item">
+                    <i class="fas fa-store detail-v2-icon"></i>
+                    <div class="detail-v2-text">
+                        <span class="detail-v2-title">${marketName}</span>
+                        <span class="detail-v2-subtitle">${address}</span>
+                    </div>
+                </div>
+                <div class="detail-v2-item">
+                    <i class="fas fa-box-open detail-v2-icon"></i>
+                    <div class="detail-v2-text">
+                        <span class="detail-v2-title">Unidade</span>
+                        <span class="detail-v2-subtitle">${item.tipo_unidade || 'UN'}</span>
+                    </div>
+                </div>
+                <div class="detail-v2-item">
+                    <i class="fas fa-calendar-alt detail-v2-icon"></i>
+                    <div class="detail-v2-text">
+                        <span class="detail-v2-title">Última Venda</span>
+                        <span class="detail-v2-subtitle">${date}</span>
+                    </div>
                 </div>
             </div>
-            <div class="detail-v2-item">
-                <i class="fas fa-box-open detail-v2-icon"></i>
-                <div class="detail-v2-text">
-                    <span class="detail-v2-title">Unidade</span>
-                    <span class="detail-v2-subtitle">${item.tipo_unidade || 'UN'}</span>
-                </div>
-            </div>
-            <div class="detail-v2-item">
-                <i class="fas fa-calendar-alt detail-v2-icon"></i>
-                <div class="detail-v2-text">
-                    <span class="detail-v2-title">Última Venda</span>
-                    <span class="detail-v2-subtitle">${date}</span>
-                </div>
-            </div>
-        </div>
 
-        <div class="card-v2-footer">
-            <i class="fas fa-barcode"></i>
-            <span>${item.codigo_barras || 'Sem código de barras'}</span>
-        </div>
-    </div>`;
-};
+            <div class="card-v2-footer">
+                <i class="fas fa-barcode"></i>
+                <span>${item.codigo_barras || 'Sem código de barras'}</span>
+            </div>
+        </div>`;
+    };
 
     const applyFilters = () => {
         if (currentResults.length === 0) return;
@@ -161,12 +166,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // --- FUNÇÃO PARA FILTRAR MERCADOS NA LISTA ---
+    const filterMarkets = (searchTerm) => {
+        const filteredMarkets = allMarkets.filter(market => 
+            market.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (market.endereco && market.endereco.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+        renderMarketFilters(filteredMarkets);
+    };
+
     // --- LÓGICA DE BUSCA E INICIALIZAÇÃO ---
     const loadSupermarkets = async () => {
         try {
             const response = await fetch(`/api/supermarkets/public`);
             if (!response.ok) throw new Error('Falha ao carregar mercados.');
             allMarkets = await response.json();
+            
+            // Preenche o marketMap para acesso rápido por CNPJ
+            marketMap = {};
+            allMarkets.forEach(market => {
+                marketMap[market.cnpj] = {
+                    nome: market.nome,
+                    endereco: market.endereco
+                };
+            });
+            
             renderMarketFilters(allMarkets);
         } catch (error) {
             console.error(error);
@@ -210,20 +234,24 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoader(true);
         resultsGrid.innerHTML = '';
         currentResults = [];
-        resultsFilters.style.display = 'none';
+        resultsFiltersPanel.style.display = 'none';
 
         try {
             let response;
-            // AQUI ESTÁ A CORREÇÃO: Usamos a função `authenticatedFetch` do auth.js
-            // para TODAS as buscas, garantindo que o token seja enviado e o logout não ocorra.
+            // Usa a função `authenticatedFetch` do auth.js para TODAS as buscas
             if (isRealtime) {
                 response = await authenticatedFetch('/api/realtime-search', { 
                     method: 'POST', 
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
                     body: JSON.stringify({ produto: query, cnpjs: selectedCnpjs }) 
                 });
             } else {
                 let url = `/api/search?q=${encodeURIComponent(query)}`;
-                if (selectedCnpjs.length > 0) url += `&${selectedCnpjs.map(cnpj => `cnpjs=${cnpj}`).join('&')}`;
+                if (selectedCnpjs.length > 0) {
+                    url += `&cnpjs=${selectedCnpjs.join('&cnpjs=')}`;
+                }
                 response = await authenticatedFetch(url);
             }
 
@@ -238,7 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentResults.length === 0) {
                 showMessage(`Nenhum resultado encontrado para "${query}".`);
             } else {
-                resultsFilters.style.display = 'block';
+                resultsFiltersPanel.style.display = 'block';
                 updateMarketFilter(currentResults);
                 applyFilters();
             }
@@ -253,21 +281,46 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- EVENTOS ---
     searchButton.addEventListener('click', () => performSearch(false));
     realtimeSearchButton.addEventListener('click', () => performSearch(true));
-    searchInput.addEventListener('keypress', (event) => { if (event.key === 'Enter') performSearch(false); });
-    clearSearchButton.addEventListener('click', () => { searchInput.value = ''; resultsGrid.innerHTML = ''; resultsFilters.style.display = 'none'; });
-    marketFilter.addEventListener('change', applyFilters);
-    sortFilter.addEventListener('change', applyFilters);
-    clearFiltersButton.addEventListener('click', () => { marketFilter.value = 'all'; sortFilter.value = 'recent'; applyFilters(); });
+    searchInput.addEventListener('keypress', (event) => { 
+        if (event.key === 'Enter') performSearch(false); 
+    });
+    clearSearchButton.addEventListener('click', () => { 
+        searchInput.value = ''; 
+        resultsGrid.innerHTML = ''; 
+        resultsFiltersPanel.style.display = 'none'; 
+    });
+    marketFilterDropdown.addEventListener('change', applyFilters);
+    sortFilterDropdown.addEventListener('change', applyFilters);
+    clearFiltersButton.addEventListener('click', () => { 
+        marketFilterDropdown.value = 'all'; 
+        sortFilterDropdown.value = 'recent'; 
+        applyFilters(); 
+    });
+    
+    // Eventos para filtros de mercado
     marketSearchInput.addEventListener('input', (e) => filterMarkets(e.target.value));
-    selectAllMarkets.addEventListener('click', () => {
-        document.querySelectorAll('.market-card input').forEach(cb => { cb.checked = true; cb.parentElement.classList.add('selected'); });
+    clearMarketSearch.addEventListener('click', () => {
+        marketSearchInput.value = '';
+        filterMarkets('');
+    });
+    
+    selectAllMarketsBtn.addEventListener('click', () => {
+        document.querySelectorAll('.market-card input').forEach(cb => { 
+            cb.checked = true; 
+            cb.parentElement.classList.add('selected'); 
+        });
         updateSelectionCount();
     });
-    deselectAllMarkets.addEventListener('click', () => {
-        document.querySelectorAll('.market-card input').forEach(cb => { cb.checked = false; cb.parentElement.classList.remove('selected'); });
+    
+    deselectAllMarketsBtn.addEventListener('click', () => {
+        document.querySelectorAll('.market-card input').forEach(cb => { 
+            cb.checked = false; 
+            cb.parentElement.classList.remove('selected'); 
+        });
         updateSelectionCount();
     });
 
+    // Inicialização
     loadSupermarkets();
 
     // --- EXPOR RESULTADOS E NOTIFICAR PRICE-SORTER ---
@@ -286,6 +339,3 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 100);
     };
 });
-
-
-
