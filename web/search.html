@@ -11,9 +11,9 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="auth.js"></script>
-    <script src="theme.js"></script> <!-- Adicione esta linha -->
+    <script src="theme.js"></script>
 </head>
-<body class="theme-dark"> <!-- A classe será gerenciada pelo theme.js -->
+<body class="theme-dark">
     <script>routeGuard();</script>
 
     <div class="app-container">
@@ -44,12 +44,11 @@
             <div class="theme-switcher">
                 <span>Tema</span>
                 <button id="themeToggle" aria-label="Alternar tema">
-                    <i class="fas fa-moon"></i> <!-- Será atualizado automaticamente -->
+                    <i class="fas fa-moon"></i>
                 </button>
             </div>
         </aside>
 
-        <!-- Resto do HTML permanece exatamente igual -->
         <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
         <div class="main-content">
@@ -100,11 +99,9 @@
                             <button id="clearSearchButton" class="clear-search"><i class="fas fa-times"></i></button>
                         </div>
                         <div class="search-buttons">
-                            <button id="searchButton" class="btn"><i class="fas fa-database"></i> Buscar no Banco</button>
-                            <button id="realtimeSearchButton" class="btn"><i class="fas fa-bolt"></i> Buscar em Tempo Real</button>
+                            <button id="searchButton" class="btn"><i class="fas fa-bolt"></i> Buscar em Tempo Real</button>
                         </div>
                         
-                        <!-- Filtros de Supermercado Melhorados -->
                         <details id="filters-details" class="market-filters" role="group" aria-labelledby="filters-toggle">
                             <summary id="filters-toggle" role="button" aria-expanded="false" aria-controls="filters-container">
                                 <div class="summary-content">
@@ -141,7 +138,6 @@
                         <p>Buscando produtos...</p>
                     </div>
                     
-                    <!-- Área para os filtros de resultados -->
                     <div id="resultsFilters" class="admin-panel" style="display: none; margin-top: 2rem;">
                         <div class="panel-header">
                             <i class="fas fa-sliders-h"></i>
