@@ -6138,3 +6138,49 @@ body.light-mode .form-group input {
         font-size: 1.5rem;
     }
 }
+
+/* Estilos para a informação da última venda */
+.last-sale-info {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.last-sale-label {
+    font-size: 0.7rem;
+    color: var(--muted-dark);
+    font-weight: 500;
+}
+
+.last-sale-date {
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.sale-date-red {
+    color: #ef4444 !important;
+}
+
+.unavailable-date {
+    color: var(--muted-dark) !important;
+}
+
+body.light-mode .last-sale-label {
+    color: var(--muted-light);
+}
+
+body.light-mode .sale-date-red {
+    color: #dc2626 !important;
+}
+
+body.light-mode .unavailable-date {
+    color: var(--muted-light) !important;
+}
+
+/* Ajustar o layout das informações do mercado */
+.market-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
