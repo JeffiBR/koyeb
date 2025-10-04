@@ -56,50 +56,59 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
    const buildProductCard = (item, allItemsInResult) => {
-    // Formatação do preço
     const price = typeof item.preco_produto === 'number' 
         ? `R$ ${item.preco_produto.toFixed(2).replace('.', ',')}` 
         : 'N/A';
 
-    // Formatação da data
     const date = item.data_ultima_venda 
         ? new Date(item.data_ultima_venda).toLocaleDateString('pt-BR') 
         : 'N/A';
 
-    // Determina se o preço é o mais baixo nos resultados
+    // --- LÓGICA CORRIGIDA PARA ACESSAR O ENDEREÇO ---
+    // O endereço agora vem de um objeto aninhado 'supermercados'
+    const address = item.supermercados && item.supermercados.endereco 
+        ? item.supermercados.endereco 
+        : 'Endereço não disponível';
+
     const prices = allItemsInResult.map(r => r.preco_produto).filter(p => typeof p === 'number');
     const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
     const isCheapest = prices.length > 1 && item.preco_produto === minPrice;
 
-    // Define a classe para destaque de preço
-    const priceHighlightClass = isCheapest ? 'cheapest' : '';
-
-    // Nova estrutura do Card
+    // Nova estrutura HTML do Card, mais alinhada com o style.css
     return `
-    <div class="product-card" data-price="${item.preco_produto || 0}" data-cheapest="${isCheapest}">
-        <div class="card-content">
-            <h3 class="product-name">${item.nome_produto || 'Produto sem nome'}</h3>
-            <div class="product-price ${priceHighlightClass}">${price}</div>
-            
-            <div class="market-info">
-                <span class="supermarket-name">${item.nome_supermercado || 'Supermercado não informado'}</span>
-                <span class="supermarket-address">${item.endereco_supermercado || 'Endereço não disponível'}</span>
-            </div>
-
-            <ul class="product-details">
-                <li>
-                    <i class="fas fa-weight-hanging"></i>
-                    <span>${item.tipo_unidade || 'UN'}</span>
-                </li>
-                <li>
-                    <i class="fas fa-calendar-alt"></i>
-                    <span>${date}</span>
-                </li>
-            </ul>
+    <div class="product-card-v2" data-cheapest="${isCheapest}">
+        <div class="card-v2-header">
+            <h3 class="product-v2-name">${item.nome_produto || 'Produto sem nome'}</h3>
+            <div class="product-v2-price">${price}</div>
         </div>
-        <div class="card-footer">
+
+        <div class="card-v2-body">
+            <div class="detail-v2-item">
+                <i class="fas fa-store detail-v2-icon"></i>
+                <div class="detail-v2-text">
+                    <span class="detail-v2-title">${item.nome_supermercado || 'Supermercado'}</span>
+                    <span class="detail-v2-subtitle">${address}</span>
+                </div>
+            </div>
+            <div class="detail-v2-item">
+                <i class="fas fa-box-open detail-v2-icon"></i>
+                <div class="detail-v2-text">
+                    <span class="detail-v2-title">Unidade</span>
+                    <span class="detail-v2-subtitle">${item.tipo_unidade || 'UN'}</span>
+                </div>
+            </div>
+            <div class="detail-v2-item">
+                <i class="fas fa-calendar-alt detail-v2-icon"></i>
+                <div class="detail-v2-text">
+                    <span class="detail-v2-title">Última Venda</span>
+                    <span class="detail-v2-subtitle">${date}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-v2-footer">
             <i class="fas fa-barcode"></i>
-            <span>${item.codigo_barras || 'Sem código'}</span>
+            <span>${item.codigo_barras || 'Sem código de barras'}</span>
         </div>
     </div>`;
 };
@@ -277,5 +286,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 100);
     };
 });
+
 
 
