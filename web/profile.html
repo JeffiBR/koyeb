@@ -9,301 +9,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="profile.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="auth.js"></script>
     <script src="user-menu.js"></script>
     <script src="theme.js"></script>
-    <style>
-        .profile-container {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        .form-section {
-            background: var(--card-bg);
-            border-radius: 12px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .form-section h3 {
-            margin: 0 0 1.5rem 0;
-            color: var(--text-primary);
-            font-size: 1.25rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 2px solid var(--border-color);
-        }
-
-        .form-section h3 i {
-            color: var(--primary);
-        }
-
-        .avatar-management {
-            display: grid;
-            grid-template-columns: 200px 1fr;
-            gap: 2.5rem;
-            align-items: start;
-        }
-
-        .current-avatar {
-            text-align: center;
-            padding: 1.5rem;
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            border: 2px dashed var(--border-color);
-        }
-
-        .current-avatar img {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 4px solid var(--primary);
-            margin-bottom: 1rem;
-        }
-
-        .avatar-actions {
-            margin-top: 1rem;
-        }
-
-        .avatar-upload {
-            flex: 1;
-        }
-
-        .avatar-preview {
-            margin-top: 1.5rem;
-            padding: 1.5rem;
-            background: var(--bg-secondary);
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-        }
-
-        .avatar-preview span {
-            font-weight: 500;
-            color: var(--text-secondary);
-            margin-bottom: 0.5rem;
-            display: block;
-        }
-
-        .avatar-preview img {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid var(--primary);
-        }
-
-        .password-fields {
-            position: relative;
-        }
-
-        .form-group {
-            position: relative;
-            margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-size: 0.95rem;
-            transition: all 0.3s ease;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        .form-group input:required {
-            border-left: 3px solid var(--primary);
-        }
-
-        .btn-password-toggle {
-            position: absolute;
-            right: 12px;
-            top: 42px;
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 4px;
-            transition: all 0.3s ease;
-        }
-
-        .btn-password-toggle:hover {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-        }
-
-        .form-actions {
-            margin-top: 2.5rem;
-            display: flex;
-            gap: 1rem;
-            flex-direction: column;
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-outline {
-            background: transparent;
-            border: 2px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 1rem 2rem;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .btn-outline:hover {
-            background: var(--bg-secondary);
-            border-color: var(--text-secondary);
-        }
-
-        .full-width {
-            width: 100%;
-        }
-
-        .status-message {
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            margin-top: 1.5rem;
-            text-align: center;
-            font-weight: 500;
-            border: 1px solid transparent;
-        }
-
-        .status-message.success {
-            background: rgba(34, 197, 94, 0.1);
-            color: rgb(34, 197, 94);
-            border-color: rgba(34, 197, 94, 0.2);
-        }
-
-        .status-message.error {
-            background: rgba(239, 68, 68, 0.1);
-            color: rgb(239, 68, 68);
-            border-color: rgba(239, 68, 68, 0.2);
-        }
-
-        .status-message.info {
-            background: rgba(59, 130, 246, 0.1);
-            color: rgb(59, 130, 246);
-            border-color: rgba(59, 130, 246, 0.2);
-        }
-
-        .form-group small {
-            display: block;
-            margin-top: 0.25rem;
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-        }
-
-        /* Responsividade */
-        @media (max-width: 768px) {
-            .avatar-management {
-                grid-template-columns: 1fr;
-                gap: 1.5rem;
-            }
-            
-            .current-avatar {
-                text-align: left;
-                display: flex;
-                align-items: center;
-                gap: 1.5rem;
-                padding: 1rem;
-            }
-            
-            .current-avatar img {
-                width: 80px;
-                height: 80px;
-                margin-bottom: 0;
-            }
-
-            .form-section {
-                padding: 1.5rem;
-            }
-
-            .form-actions {
-                flex-direction: column;
-            }
-
-            .btn-primary, .btn-outline {
-                padding: 0.875rem 1.5rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .current-avatar {
-                flex-direction: column;
-                text-align: center;
-                gap: 1rem;
-            }
-
-            .avatar-actions {
-                width: 100%;
-            }
-
-            .btn-outline {
-                width: 100%;
-            }
-        }
-
-        .loading-spinner {
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-    </style>
 </head>
 <body class="theme-dark">
     <script>routeGuard();</script>
@@ -387,6 +97,24 @@
                     <p class="panel-description">Gerencie suas informações pessoais, credenciais e preferências.</p>
                     
                     <div class="profile-container">
+                        <!-- Cabeçalho do Perfil -->
+                        <div class="profile-header">
+                            <div class="profile-avatar">
+                                <img src="https://ui-avatars.com/api/?name=U" alt="Avatar atual" id="currentAvatar">
+                                <div class="avatar-overlay" id="avatarOverlay">
+                                    <i class="fas fa-camera"></i>
+                                </div>
+                            </div>
+                            <div class="profile-info">
+                                <h1 class="profile-name" id="profileDisplayName">Usuário</h1>
+                                <p class="profile-role" id="profileDisplayRole">Cargo/Função</p>
+                                <div class="profile-email">
+                                    <i class="fas fa-envelope"></i>
+                                    <span id="profileDisplayEmail">seu.email@exemplo.com</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Seção de Informações Pessoais -->
                         <div class="form-section">
                             <h3><i class="fas fa-id-card"></i> Informações Pessoais</h3>
@@ -409,20 +137,65 @@
                                 <div class="current-avatar">
                                     <img src="https://ui-avatars.com/api/?name=U" alt="Avatar atual" id="currentAvatar">
                                     <div class="avatar-actions">
-                                        <button type="button" id="removeAvatarBtn" class="btn-outline full-width">
-                                            <i class="fas fa-trash"></i> Remover Foto
+                                        <button type="button" id="removeAvatarBtn" class="remove-btn danger-gradient floating-3d remove-btn-tooltip">
+                                            <i class="fas fa-trash-alt"></i> Remover Foto
                                         </button>
                                     </div>
                                 </div>
-                                <div class="avatar-upload">
-                                    <div class="form-group">
-                                        <label for="avatarFile">Alterar Foto de Perfil</label>
-                                        <input type="file" id="avatarFile" accept="image/jpeg,image/png,image/gif">
-                                        <small>Formatos suportados: JPG, PNG, GIF (Máx. 1MB)</small>
+                                
+                                <div class="avatar-upload-container">
+                                    <div class="upload-container">
+                                        <div class="upload-area" id="uploadArea">
+                                            <div class="upload-icon">
+                                                <i class="fas fa-cloud-upload-alt"></i>
+                                            </div>
+                                            
+                                            <div class="upload-text">
+                                                <h3>Arraste e solte sua foto aqui</h3>
+                                                <p>ou clique no botão abaixo para procurar</p>
+                                            </div>
+                                            
+                                            <button class="browse-btn" id="browseBtn">
+                                                <i class="fas fa-folder-open"></i>
+                                                Escolher arquivo
+                                            </button>
+                                            
+                                            <input type="file" id="avatarFile" class="file-input" accept="image/jpeg,image/png,image/gif">
+                                            
+                                            <div class="drag-overlay">
+                                                <div class="drag-text">
+                                                    <i class="fas fa-cloud-upload-alt"></i> Solte a imagem aqui
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="file-info" id="fileInfo" style="display: none;">
+                                            <i class="fas fa-file-image"></i>
+                                            <span class="file-name" id="fileName">Nenhum arquivo escolhido</span>
+                                            <span class="file-size" id="fileSize"></span>
+                                            <button class="file-remove" id="fileRemove">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="progress-bar" id="progressBar">
+                                            <div class="progress-fill" id="progressFill"></div>
+                                        </div>
+                                        
+                                        <div class="success-message" id="successMessage">
+                                            <i class="fas fa-check-circle"></i>
+                                            <span>Foto de perfil atualizada com sucesso!</span>
+                                        </div>
+                                        
+                                        <div class="error-message" id="errorMessage">
+                                            <i class="fas fa-exclamation-circle"></i>
+                                            <span id="errorText">Erro ao carregar a imagem. Tente novamente.</span>
+                                        </div>
                                     </div>
-                                    <div id="avatarPreview" class="avatar-preview" style="display: none;">
-                                        <span>Pré-visualização:</span>
-                                        <img id="previewImage" alt="Pré-visualização da nova foto">
+
+                                    <div class="preview-container" id="previewContainer">
+                                        <span class="preview-label">Pré-visualização</span>
+                                        <img src="https://via.placeholder.com/150/0b1020/4f46e5?text=Preview" alt="Pré-visualização" class="preview-image" id="previewImage">
                                     </div>
                                 </div>
                             </div>
@@ -484,40 +257,6 @@
     <script src="mobile-menu.js"></script>
     <script src="user-menu.js"></script>
     <script src="user-activity-monitor.js"></script>
-    <script>
-        // Inicialização do tema
-        document.addEventListener('DOMContentLoaded', function() {
-            const themeToggle = document.getElementById('themeToggle');
-            if (themeToggle) {
-                themeToggle.addEventListener('click', function() {
-                    const isDark = document.body.classList.contains('theme-dark');
-                    document.body.classList.toggle('theme-dark', !isDark);
-                    document.body.classList.toggle('theme-light', isDark);
-                    
-                    const icon = this.querySelector('i');
-                    if (isDark) {
-                        icon.className = 'fas fa-sun';
-                    } else {
-                        icon.className = 'fas fa-moon';
-                    }
-                    
-                    // Salvar preferência
-                    localStorage.setItem('theme', isDark ? 'light' : 'dark');
-                });
-            }
-
-            // Carregar tema salvo
-            const savedTheme = localStorage.getItem('theme') || 'dark';
-            document.body.classList.toggle('theme-dark', savedTheme === 'dark');
-            document.body.classList.toggle('theme-light', savedTheme === 'light');
-            
-            const themeIcon = document.getElementById('themeToggle')?.querySelector('i');
-            if (themeIcon) {
-                themeIcon.className = savedTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
-            }
-        });
-    </script> 
-    <script src="user-menu.js"></script>
     <script src="profile.js"></script>
 </body>
 </html>
