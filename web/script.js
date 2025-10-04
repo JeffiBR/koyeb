@@ -56,39 +56,53 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
    const buildProductCard = (item, allItemsInResult) => {
-    const price = typeof item.preco_produto === 'number'
-        ? `R$ ${item.preco_produto.toFixed(2).replace('.', ',')}`
+    // Formatação do preço
+    const price = typeof item.preco_produto === 'number' 
+        ? `R$ ${item.preco_produto.toFixed(2).replace('.', ',')}` 
         : 'N/A';
-    const date = item.data_ultima_venda
-        ? new Date(item.data_ultima_venda).toLocaleDateString('pt-BR')
+
+    // Formatação da data
+    const date = item.data_ultima_venda 
+        ? new Date(item.data_ultima_venda).toLocaleDateString('pt-BR') 
         : 'N/A';
+
+    // Determina se o preço é o mais baixo nos resultados
     const prices = allItemsInResult.map(r => r.preco_produto).filter(p => typeof p === 'number');
     const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-    const priceClass = (prices.length > 1 && item.preco_produto === minPrice) ? 'cheapest-price' : '';
+    const isCheapest = prices.length > 1 && item.preco_produto === minPrice;
 
+    // Define a classe para destaque de preço
+    const priceHighlightClass = isCheapest ? 'cheapest' : '';
+
+    // Nova estrutura do Card
     return `
-    <div class="product-card ${priceClass}" data-price="${item.preco_produto || 0}">
-        <div class="card-header">
-            <div class="product-name">${item.nome_produto || 'Produto sem nome'}</div>
+    <div class="product-card" data-price="${item.preco_produto || 0}" data-cheapest="${isCheapest}">
+        <div class="card-content">
+            <h3 class="product-name">${item.nome_produto || 'Produto sem nome'}</h3>
+            <div class="product-price ${priceHighlightClass}">${price}</div>
+            
+            <div class="market-info">
+                <span class="supermarket-name">${item.nome_supermercado || 'Supermercado não informado'}</span>
+                <span class="supermarket-address">${item.endereco_supermercado || 'Endereço não disponível'}</span>
+            </div>
+
+            <ul class="product-details">
+                <li>
+                    <i class="fas fa-weight-hanging"></i>
+                    <span>${item.tipo_unidade || 'UN'}</span>
+                </li>
+                <li>
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>${date}</span>
+                </li>
+            </ul>
         </div>
-        <div class="price-section">
-            <div class="product-price">${price}</div>
+        <div class="card-footer">
+            <i class="fas fa-barcode"></i>
+            <span>${item.codigo_barras || 'Sem código'}</span>
         </div>
-        <ul class="product-details">
-            <li>
-                <i class="fas fa-store"></i>
-                <div class="detail-text">
-                    <span class="supermarket-name">${item.nome_supermercado}</span>
-                    <span class="supermarket-address"><i class="fas fa-map-marker-alt"></i> ${item.endereco || 'Endereço não disponível'}</span>
-                </div>
-            </li>
-            <li><i class="fas fa-weight-hanging"></i> ${item.tipo_unidade || 'UN'} (${item.unidade_medida || 'N/A'})</li>
-            <li><i class="fas fa-calendar-alt"></i> <span class="sale-date">Última Venda: ${date}</span></li>
-            <li><i class="fas fa-barcode"></i> ${item.codigo_barras || 'Sem código'}</li>
-        </ul>
     </div>`;
 };
-
 
     const applyFilters = () => {
         if (currentResults.length === 0) return;
@@ -263,4 +277,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 100);
     };
 });
+
 
