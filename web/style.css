@@ -4880,3 +4880,37 @@ body.light-mode .price-value {
         font-size: 1.8rem;
     }
 }
+/* ====== CORREÇÃO DA BOLINHA DE SELEÇÃO NO MODO CLARO ====== */
+body.light-mode .market-card.selected::before {
+    background: var(--success) !important;
+    border-color: var(--success) !important;
+}
+
+body.light-mode .market-card.selected::after {
+    content: '\f00c' !important;
+    font-family: 'Font Awesome 5 Free' !important;
+    font-weight: 900 !important;
+    position: absolute !important;
+    top: 50% !important;
+    right: 12px !important;
+    transform: translateY(-50%) !important;
+    color: #fff !important;
+    font-size: 0.7em !important;
+    width: 18px !important;
+    height: 18px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 2 !important;
+}
+
+/* Garantir que o texto fique visível no modo claro */
+body.light-mode .market-card.selected .market-name {
+    color: var(--primary) !important;
+    font-weight: 700 !important;
+}
+
+body.light-mode .market-card.selected .market-address {
+    color: var(--primary) !important;
+    opacity: 0.8 !important;
+}
