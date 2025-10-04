@@ -918,7 +918,9 @@ async def search_products(
     current_user: Optional[UserProfile] = Depends(get_current_user_optional)
 ):
     termo_busca = f"%{q.lower().strip()}%"
-    query = supabase.table('produtos').select('*').ilike('nome_produto_normalizado', termo_busca)
+    query = supabase.table('produtos').select(
+    '*, supermercados(endereco)'
+).ilike('nome_produto_normalizado', termo_busca)
     if cnpjs: 
         query = query.in_('cnpj_supermercado', cnpjs)
     
@@ -1098,3 +1100,4 @@ app.mount("/", StaticFiles(directory="web", html=True), name="static")
 @app.get("/")
 def read_root():
     return {"message": "Bem-vindo à API de Preços AL - Versão 3.1.2"}
+
