@@ -319,17 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         try {
             const date = new Date(dateString);
-            const now = new Date();
-            const diffTime = Math.abs(now - date);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
-            if (diffDays === 1) {
-                return 'Ontem ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            } else if (diffDays <= 7) {
-                return `Há ${diffDays} dias`;
-            } else {
-                return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            }
+            return date.toLocaleDateString('pt-BR'); // Apenas a data no formato brasileiro
         } catch (e) {
             return 'Data não disponível';
         }
@@ -383,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="market-info">
                         <span class="market-name">${priceData.marketName}</span>
                         <span class="market-address">${priceData.marketAddress}</span>
-                        <span class="last-sale-date">${priceData.lastSaleDate}</span>
+                        <span class="last-sale-date unavailable-date">${priceData.lastSaleDate}</span>
                     </div>
                     <div class="price-info">
                         <span class="price-value">Indisponível</span>
@@ -400,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="market-info">
                     <span class="market-name">${priceData.marketName}</span>
                     <span class="market-address">${priceData.marketAddress}</span>
-                    <span class="last-sale-date">${priceData.lastSaleDate}</span>
+                    <span class="last-sale-date sale-date-red">${priceData.lastSaleDate}</span>
                 </div>
                 <div class="price-info">
                     <span class="price-value">R$ ${priceData.price.toFixed(2)}</span>
