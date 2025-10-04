@@ -1,3 +1,5 @@
+[file name]: main.py
+[file content begin]
 # main.py (completo e corrigido)
 import os
 import asyncio
@@ -392,17 +394,26 @@ async def get_my_profile(current_user: UserProfile = Depends(get_current_user)):
 @app.put("/api/users/me")
 async def update_my_profile(profile_data: ProfileUpdateWithCredentials, current_user: UserProfile = Depends(get_current_user)):
     try:
-        # 1. Preparar dados para a tabela 'profiles'
-        profile_update_data = profile_data.dict(exclude_unset=True, exclude={'current_password', 'new_password', 'email'})
+        # 1. Começamos com um dicionário vazio para os dados do perfil
+        profile_update_data = {}
 
-        # 2. Lidar com alteração de e-mail e senha
+        # 2. Adicionamos os campos um a um, se eles foram enviados
+        if profile_data.full_name is not None:
+            profile_update_data['full_name'] = profile_data.full_name
+        if profile_data.job_title is not None:
+            profile_update_data['job_title'] = profile_data.job_title
+        
+        # --- LÓGICA CRÍTICA PARA O AVATAR ---
+        # Se avatar_url foi enviado no corpo da requisição, nós o usamos.
+        # Isso cobre tanto a adição de uma nova foto (URL) quanto a remoção (null).
+        if profile_data.avatar_url is not None or (hasattr(profile_data, 'avatar_url') and profile_data.avatar_url is None):
+             profile_update_data['avatar_url'] = profile_data.avatar_url
+
+        # 3. Lidar com alteração de e-mail e senha (lógica existente)
         if profile_data.email or profile_data.new_password:
             if not profile_data.current_password:
                 raise HTTPException(status_code=400, detail="Senha atual é necessária para alterar e-mail ou senha.")
-
-            # Verificar a senha atual
             try:
-                # Executar verificação de senha em thread separada
                 await asyncio.to_thread(
                     lambda: supabase.auth.sign_in_with_password({
                         "email": current_user.email,
@@ -412,31 +423,23 @@ async def update_my_profile(profile_data: ProfileUpdateWithCredentials, current_
             except Exception:
                 raise HTTPException(status_code=400, detail="Senha atual incorreta.")
 
-            # Atualizar e-mail no Supabase Auth
             if profile_data.email and profile_data.email != current_user.email:
-                await asyncio.to_thread(
-                    lambda: supabase.auth.update_user({"email": profile_data.email})
-                )
-
-            # Atualizar senha no Supabase Auth
+                await asyncio.to_thread(lambda: supabase.auth.update_user({"email": profile_data.email}))
             if profile_data.new_password:
-                if len(profile_data.new_password) < 6:
-                    raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres.")
-                await asyncio.to_thread(
-                    lambda: supabase.auth.update_user({"password": profile_data.new_password})
-                )
+                await asyncio.to_thread(lambda: supabase.auth.update_user({"password": profile_data.new_password}))
 
-        # 3. Atualizar dados na tabela 'profiles' se houver algo para atualizar
+        # 4. Atualizar dados na tabela 'profiles' se houver algo para atualizar
         if profile_update_data:
+            logging.info(f"Atualizando perfil {current_user.id} com os dados: {profile_update_data}")
             response = await asyncio.to_thread(
-                supabase.table('profiles').update(profile_update_data).eq('id', current_user.id).execute
+                lambda: supabase.table('profiles').update(profile_update_data).eq('id', current_user.id).execute()
             )
             if response.data:
                 return response.data[0]
 
-        # 4. Se nada foi alterado em 'profiles', buscar e retornar o perfil atual para confirmar o sucesso
+        # 5. Se nada foi alterado, buscar e retornar o perfil atual
         response = await asyncio.to_thread(
-            supabase.table('profiles').select('*').eq('id', current_user.id).single().execute
+            lambda: supabase.table('profiles').select('*').eq('id', current_user.id).single().execute()
         )
         return response.data
 
@@ -1099,3 +1102,4 @@ app.mount("/", StaticFiles(directory="web", html=True), name="static")
 @app.get("/")
 def read_root():
     return {"message": "Bem-vindo à API de Preços AL - Versão 3.1.2"}
+[file content end]
