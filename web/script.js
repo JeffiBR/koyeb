@@ -1,8 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- ELEMENTOS DA UI (Mapeados para o seu novo HTML) ---
+    // --- ELEMENTOS DA UI ---
     const searchInput = document.getElementById('searchInput');
     const searchButton = document.getElementById('searchButton');
-    const realtimeSearchButton = document.getElementById('realtimeSearchButton');
     const clearSearchButton = document.getElementById('clearSearchButton');
     const resultsGrid = document.getElementById('resultsGrid');
     const loader = document.getElementById('loader');
@@ -24,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ESTADO DA APLICAÇÃO ---
     let currentResults = [];
     let allMarkets = [];
-    let marketMap = {}; // Mapa para associar CNPJ com dados do mercado (nome e endereço)
+    let marketMap = {};
 
     // --- FUNÇÕES DE UI E RENDERIZAÇÃO ---
     const showLoader = (show) => {
@@ -65,8 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ? new Date(item.data_ultima_venda).toLocaleDateString('pt-BR') 
             : 'N/A';
 
-        // --- LÓGICA CORRIGIDA PARA ACESSAR O ENDEREÇO ---
-        // Busca os dados do mercado no marketMap usando o CNPJ do produto
         const marketData = marketMap[item.cnpj_supermercado];
         const address = marketData && marketData.endereco 
             ? marketData.endereco 
@@ -166,7 +163,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // --- FUNÇÃO PARA FILTRAR MERCADOS NA LISTA ---
     const filterMarkets = (searchTerm) => {
         const filteredMarkets = allMarkets.filter(market => 
             market.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -182,7 +178,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error('Falha ao carregar mercados.');
             allMarkets = await response.json();
             
-            // Preenche o marketMap para acesso rápido por CNPJ
             marketMap = {};
             allMarkets.forEach(market => {
                 marketMap[market.cnpj] = {
@@ -221,13 +216,13 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSelectionCount();
     };
 
-    const performSearch = async (isRealtime = false) => {
+    const performSearch = async () => {
         const query = searchInput.value.trim();
         if (query.length < 3) {
             showMessage('Digite pelo menos 3 caracteres.'); return;
         }
         const selectedCnpjs = Array.from(document.querySelectorAll('input[name="supermarket"]:checked')).map(cb => cb.value);
-        if (isRealtime && selectedCnpjs.length === 0) {
+        if (selectedCnpjs.length === 0) {
             showMessage('Selecione ao menos um supermercado para busca em tempo real.'); return;
         }
 
@@ -237,23 +232,13 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsFiltersPanel.style.display = 'none';
 
         try {
-            let response;
-            // Usa a função `authenticatedFetch` do auth.js para TODAS as buscas
-            if (isRealtime) {
-                response = await authenticatedFetch('/api/realtime-search', { 
-                    method: 'POST', 
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ produto: query, cnpjs: selectedCnpjs }) 
-                });
-            } else {
-                let url = `/api/search?q=${encodeURIComponent(query)}`;
-                if (selectedCnpjs.length > 0) {
-                    url += `&cnpjs=${selectedCnpjs.join('&cnpjs=')}`;
-                }
-                response = await authenticatedFetch(url);
-            }
+            const response = await authenticatedFetch('/api/realtime-search', { 
+                method: 'POST', 
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ produto: query, cnpjs: selectedCnpjs }) 
+            });
 
             if (!response.ok) { 
                 const err = await response.json();
@@ -279,10 +264,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- EVENTOS ---
-    searchButton.addEventListener('click', () => performSearch(false));
-    realtimeSearchButton.addEventListener('click', () => performSearch(true));
+    searchButton.addEventListener('click', () => performSearch());
     searchInput.addEventListener('keypress', (event) => { 
-        if (event.key === 'Enter') performSearch(false); 
+        if (event.key === 'Enter') performSearch(); 
     });
     clearSearchButton.addEventListener('click', () => { 
         searchInput.value = ''; 
@@ -297,7 +281,6 @@ document.addEventListener('DOMContentLoaded', () => {
         applyFilters(); 
     });
     
-    // Eventos para filtros de mercado
     marketSearchInput.addEventListener('input', (e) => filterMarkets(e.target.value));
     clearMarketSearch.addEventListener('click', () => {
         marketSearchInput.value = '';
