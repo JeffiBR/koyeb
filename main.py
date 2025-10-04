@@ -365,28 +365,26 @@ def log_custom_action_internal(request: CustomActionRequest, user: Optional[User
 @app.get("/api/users/me")
 async def get_my_profile(current_user: UserProfile = Depends(get_current_user)):
     try:
+        # 1. Busca os dados do perfil (full_name, avatar_url, etc.)
         response = await asyncio.to_thread(
             supabase.table('profiles').select('*').eq('id', current_user.id).single().execute
         )
+        
         profile_data = response.data
         
+        # 2. Se o perfil existir, adiciona o e-mail a partir do objeto 'current_user'
+        # que já recebemos da autenticação. É a forma correta e segura.
         if profile_data:
-            # Garantir campos obrigatórios - usar get com valor padrão
-            profile_data['role'] = profile_data.get('role', 'user')
-            profile_data['allowed_pages'] = profile_data.get('allowed_pages', [])
-            
-            try:
-                user_response = supabase.auth.get_user()
-                if user_response.user:
-                    profile_data['email'] = user_response.user.email
-            except Exception as e:
-                logging.error(f"Erro ao buscar email do usuário: {e}")
-                profile_data['email'] = current_user.email or "Não disponível"
-        
+            profile_data['email'] = current_user.email
+        else:
+            # Se por algum motivo o perfil não for encontrado, retorna um erro.
+            raise HTTPException(status_code=404, detail="Perfil do usuário não encontrado.")
+
         return profile_data
+        
     except Exception as e:
-        logging.error(f"Erro ao buscar perfil do usuário: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao carregar perfil")
+        logging.error(f"Erro ao buscar o perfil do usuário: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Erro interno ao carregar o perfil do usuário.")
 
 # VERSÃO CORRIGIDA - usando asyncio.to_thread para operações síncronas
 @app.put("/api/users/me")
