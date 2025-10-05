@@ -6184,3 +6184,30 @@ body.light-mode .unavailable-date {
     flex-direction: column;
     gap: 0.125rem;
 }
+
+/* Botão de comparar preços menor */
+.btn-compare {
+    padding: 0.6rem 1.2rem !important;
+    font-size: 0.85rem !important;
+    height: auto !important;
+    min-height: 38px !important;
+}
+
+.btn-compare i {
+    font-size: 0.8rem !important;
+}
+
+/* Ajuste para o estado hover */
+.btn-compare:hover {
+    transform: translateY(-1px) scale(1.02) !important;
+}
+
+/* Ajuste para dispositivos móveis */
+@media (max-width: 768px) {
+    .btn-compare {
+        padding: 0.5rem 1rem !important;
+        font-size: 0.8rem !important;
+        min-height: 36px !important;
+        width: 100% !important;
+    }
+}
