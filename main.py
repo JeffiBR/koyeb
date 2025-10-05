@@ -1,4 +1,4 @@
-# main.py (completo e corrigido)
+# main.py (completo e atualizado)
 import os
 import asyncio
 from datetime import date, timedelta, datetime
@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 import pandas as pd
 import collector_service
+import basket_service
 
 # --------------------------------------------------------------------------
 # --- 1. CONFIGURAÇÕES INICIAIS E VARIÁVEIS DE AMBIENTE ---
@@ -176,6 +177,19 @@ app.add_middleware(
     allow_credentials=True, 
     allow_methods=["*"], 
     allow_headers=["*"]
+)
+
+# --------------------------------------------------------------------------
+# --- CONFIGURAÇÃO DOS MÓDULOS SEPARADOS ---
+# --------------------------------------------------------------------------
+
+# Configura as rotas da cesta básica
+basket_service.setup_basket_routes(
+    app=app,
+    supabase_client=supabase,
+    supabase_admin_client=supabase_admin,
+    get_current_user_dep=get_current_user,
+    get_current_user_optional_dep=get_current_user_optional
 )
 
 # --------------------------------------------------------------------------
@@ -1100,4 +1114,3 @@ app.mount("/", StaticFiles(directory="web", html=True), name="static")
 @app.get("/")
 def read_root():
     return {"message": "Bem-vindo à API de Preços AL - Versão 3.1.2"}
-
