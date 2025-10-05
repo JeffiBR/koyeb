@@ -3,7 +3,7 @@
 const SUPABASE_URL = 'https://zhaetrzpkkgzfrwxfqdw.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpoYWV0cnpwa2tnemZyd3hmcWR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0MjM3MzksImV4cCI6MjA3Mjk5OTczOX0.UHoWWZahvp_lMDH8pK539YIAFTAUnQk9mBX5tdixwN0';
 
-const supabase = self.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY );
+const supabase = self.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUserProfile = null; // Variável de cache em memória
 
 /**
@@ -103,8 +103,28 @@ async function routeGuard(requiredPermission = null) {
     }
 }
 
-// ==================================================================
-// --- FUNÇÃO ADICIONADA PARA LIMPEZA DE CACHE ---
+/**
+ * Função para verificar autenticação - necessária para a página da cesta básica
+ */
+async function checkAuth() {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        return false;
+    }
+
+    try {
+        const response = await fetch('/api/users/me', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        return response.ok;
+    } catch (error) {
+        console.error('Erro ao verificar autenticação:', error);
+        return false;
+    }
+}
+
 /**
  * Limpa a variável de cache do perfil do usuário (currentUserProfile).
  * Isso força a próxima chamada a fetchUserProfile a buscar dados frescos do servidor.
@@ -113,6 +133,121 @@ function clearUserProfileCache() {
     console.log('🧹 Cache de perfil em memória (auth.js) limpo.');
     currentUserProfile = null;
 }
-// ==================================================================
 
-// A função updateUIVisibility foi removida pois sua lógica agora está centralizada no user-menu.js
+/**
+ * Verifica se o usuário está autenticado e redireciona se necessário
+ */
+async function requireAuth(redirectUrl = '/login.html') {
+    const user = await getAuthUser();
+    if (!user) {
+        window.location.href = redirectUrl;
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Obtém o token de autenticação atual
+ */
+async function getAuthToken() {
+    const session = await getSession();
+    return session?.access_token || null;
+}
+
+/**
+ * Verifica se o usuário tem uma permissão específica
+ */
+async function hasPermission(permission) {
+    const profile = await fetchUserProfile();
+    if (!profile) return false;
+    
+    if (profile.role === 'admin') return true;
+    
+    return profile.allowed_pages && profile.allowed_pages.includes(permission);
+}
+
+/**
+ * Inicializa a autenticação e verifica o estado do usuário
+ */
+async function initAuth() {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN') {
+            console.log('Usuário fez login');
+            clearUserProfileCache(); // Limpa cache para buscar dados atualizados
+        } else if (event === 'SIGNED_OUT') {
+            console.log('Usuário fez logout');
+            clearUserProfileCache();
+            currentUserProfile = null;
+        } else if (event === 'TOKEN_REFRESHED') {
+            console.log('Token atualizado');
+        }
+    });
+
+    return subscription;
+}
+
+/**
+ * Função auxiliar para fazer login com email e senha
+ */
+async function signIn(email, password) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password
+    });
+
+    if (error) {
+        throw error;
+    }
+
+    // Salva o token no localStorage para compatibilidade
+    if (data.session) {
+        localStorage.setItem('token', data.session.access_token);
+    }
+
+    clearUserProfileCache(); // Limpa cache para buscar dados atualizados
+    return data;
+}
+
+/**
+ * Função auxiliar para cadastrar novo usuário
+ */
+async function signUp(email, password, userMetadata = {}) {
+    const { data, error } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+            data: userMetadata
+        }
+    });
+
+    if (error) {
+        throw error;
+    }
+
+    return data;
+}
+
+// Inicializa a autenticação quando o script é carregado
+document.addEventListener('DOMContentLoaded', function() {
+    initAuth().catch(console.error);
+});
+
+// Exporta funções para uso global (se necessário)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        authenticatedFetch,
+        getAuthUser,
+        fetchUserProfile,
+        getSession,
+        signOut,
+        routeGuard,
+        checkAuth,
+        clearUserProfileCache,
+        requireAuth,
+        getAuthToken,
+        hasPermission,
+        initAuth,
+        signIn,
+        signUp
+    };
+}
