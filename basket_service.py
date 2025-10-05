@@ -1,11 +1,11 @@
 # basket_service.py
 import logging
+import asyncio
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from supabase import Client
 
 # Modelos Pydantic para a cesta básica
 class BasketProduct(BaseModel):
@@ -27,7 +27,12 @@ class BasketCalculationRequest(BaseModel):
 # Cria o roteador para a cesta básica
 basket_router = APIRouter(prefix="/api/basket", tags=["basket"])
 
-# Dependências serão injetadas do main.py
+# Variáveis globais que serão configuradas posteriormente
+supabase = None
+supabase_admin = None
+get_current_user = None
+get_current_user_optional = None
+
 def setup_basket_routes(app, supabase_client, supabase_admin_client, get_current_user_dep, get_current_user_optional_dep):
     """
     Configura as rotas da cesta básica com as dependências do main.py
@@ -43,7 +48,7 @@ def setup_basket_routes(app, supabase_client, supabase_admin_client, get_current
 
 # Endpoints da cesta básica
 @basket_router.get("/")
-async def get_user_basket(current_user: dict = Depends(get_current_user)):
+async def get_user_basket(current_user: dict = Depends(lambda: get_current_user())):
     try:
         response = await asyncio.to_thread(
             supabase.table('user_baskets').select('*').eq('user_id', current_user.id).execute
@@ -66,7 +71,7 @@ async def get_user_basket(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Erro ao carregar cesta")
 
 @basket_router.put("/")
-async def update_user_basket(basket: UserBasket, current_user: dict = Depends(get_current_user)):
+async def update_user_basket(basket: UserBasket, current_user: dict = Depends(lambda: get_current_user())):
     try:
         # Verifica se a cesta pertence ao usuário
         existing_response = await asyncio.to_thread(
@@ -91,7 +96,7 @@ async def update_user_basket(basket: UserBasket, current_user: dict = Depends(ge
         raise HTTPException(status_code=500, detail="Erro ao atualizar cesta")
 
 @basket_router.post("/calculate")
-async def calculate_basket_prices(request: BasketCalculationRequest, current_user: dict = Depends(get_current_user)):
+async def calculate_basket_prices(request: BasketCalculationRequest, current_user: dict = Depends(lambda: get_current_user())):
     try:
         # Busca a cesta do usuário
         basket_response = await asyncio.to_thread(
