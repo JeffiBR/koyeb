@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log de Produtos Coletados - Preços AL</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="designer.css">
+   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script src="menu.js"></script>
+    <script src="theme.js"></script>
+    <style>
+        /* ====== INDICADOR DE PÁGINA EM DESENVOLVIMENTO ====== */
+        .dev-notice {
+            background: linear-gradient(135deg, 
+                rgba(79, 70, 229, 0.08) 0%, 
+                rgba(124, 58, 237, 0.05) 50%, 
+                rgba(79, 70, 229, 0.08) 100%);
+            border-radius: 20px;
+            padding: 3rem 2rem;
+            margin: 2rem 0;
+            border: 2px dashed rgba(79, 70, 229, 0.3);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.light-mode .dev-notice {
+            background: linear-gradient(135deg, 
+                rgba(79, 70, 229, 0.05) 0%, 
+                rgba(124, 58, 237, 0.03) 50%, 
+                rgba(79, 70, 229, 0.05) 100%);
+            border: 2px dashed rgba(79, 70, 229, 0.2);
+        }
+
+        .dev-notice::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><g fill="%234f46e5" fill-opacity="0.03"><path d="M30 0l8.66 15-8.66 15-8.66 15zM60 30l-8.66-15-8.66 15 8.66 15zM30 60l-8.66-15 8.66-15 8.66 15zM0 30l8.66-15 8.66 15-8.66 15z"/></g></g></svg>');
+            animation: floatBackground 20s linear infinite;
+        }
+
+        @keyframes floatBackground {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            100% { transform: translate(-30px, -30px) rotate(360deg); }
+        }
+
+        .dev-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .dev-content i {
+            font-size: 4rem;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            display: block;
+            text-shadow: 0 0 20px rgba(79, 70, 229, 0.3);
+        }
+
+        .dev-content h3 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        body.light-mode .dev-content h3 {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .dev-content p {
+            font-size: 1.2rem;
+            color: var(--muted-dark);
+            margin-bottom: 2rem;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+        }
+
+        body.light-mode .dev-content p {
+            color: var(--muted-light);
+        }
+
+        .dev-features {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .dev-badge {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .dev-badge:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+        }
+
+        /* Animação da engrenagem */
+        .fa-spin {
+            animation: fa-spin 2s infinite linear;
+        }
+
+        @keyframes fa-spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Efeito de pulso adicional */
+        @keyframes pulse-glow {
+            0%, 100% {
+                filter: drop-shadow(0 0 10px rgba(79, 70, 229, 0.3));
+            }
+            50% {
+                filter: drop-shadow(0 0 20px rgba(79, 70, 229, 0.6));
+            }
+        }
+
+        .dev-content i {
+            animation: fa-spin 3s infinite linear, pulse-glow 2s ease-in-out infinite;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .dev-notice {
+                padding: 2rem 1.5rem;
+                margin: 1.5rem 0;
+            }
+            
+            .dev-content i {
+                font-size: 3rem;
+            }
+            
+            .dev-content h3 {
+                font-size: 1.5rem;
+            }
+            
+            .dev-content p {
+                font-size: 1.1rem;
+            }
+            
+            .dev-badge {
+                padding: 0.6rem 1.2rem;
+                font-size: 0.85rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .dev-notice {
+                padding: 1.5rem 1rem;
+            }
+            
+            .dev-content i {
+                font-size: 2.5rem;
+            }
+            
+            .dev-content h3 {
+                font-size: 1.3rem;
+            }
+            
+            .dev-content p {
+                font-size: 1rem;
+            }
+            
+            .dev-features {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .dev-badge {
+                width: 100%;
+                max-width: 200px;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body class="theme-dark">
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            if (!await requireAuth()) return;
+            await initializeDynamicMenu();
+            await checkAccessExpiration();
+            routeGuard('product_log');
+        });
+    </script>
+
+    <div class="app-container">
+        <aside class="sidebar" id="sidebarMenu">
+            <div class="sidebar-header">
+                <i class="fas fa-bolt"></i>
+                <h1>Preços AL</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="nav-header">ANÁLISE</li>
+                    <li><a href="/search.html"><i class="fas fa-search"></i> Busca</a></li>
+                    <li data-required-permission="compare"><a href="/compare.html"><i class="fas fa-chart-bar"></i> Comparador</a></li>
+                    <li data-required-permission="dashboard"><a href="/dashboard.html"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+                    <li data-required-permission="baskets"><a href="/cesta.html"><i class="fas fa-shopping-basket"></i> Minhas Cestas</a></li>
+                    
+                    <li class="nav-header">ADMINISTRAÇÃO</li>
+                    <li data-required-permission="coleta"><a href="/admin.html"><i class="fas fa-database"></i> Coleta</a></li>
+                    <li data-required-permission="collections"><a href="/collections.html"><i class="fas fa-history"></i> Histórico de Coletas</a></li>
+                    <li data-required-permission="product_log"><a href="/product-log.html"><i class="fas fa-file-alt"></i> Log de Produtos</a></li>
+                    <li data-required-permission="user_logs"><a href="/user-logs.html"><i class="fas fa-user-clock"></i> Logs de Usuários</a></li>
+                    <li data-required-permission="prune"><a href="/prune.html"><i class="fas fa-broom"></i> Limpeza de Dados</a></li>
+
+                    <li class="nav-header">CONFIGURAÇÃO</li>
+                    <li data-required-permission="markets"><a href="/markets.html"><i class="fas fa-store"></i> Gerenciar Mercados</a></li>
+                    <li data-required-permission="users"><a href="/users.html"><i class="fas fa-users"></i> Gerenciar Usuários</a></li>
+                    <li data-required-permission="users"><a href="/group-admin-users.html"><i class="fas fa-layer-group"></i> Gerenciar Grupos</a></li>
+                    <li data-required-permission="users"><a href="/group-admin.html"><i class="fas fa-user-shield"></i> Subadministradores</a></li>
+                </ul>
+            </nav>
+            <div class="theme-switcher">
+                <span>Tema</span>
+                <button id="themeToggle"><i class="fas fa-moon"></i></button>
+            </div>
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-content">
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <button class="mobile-menu-btn" id="mobileMenuBtn">
+                        <span></span><span></span><span></span>
+                    </button>
+                </div>
+                <div class="top-bar-right">
+                    <div class="user-menu" id="userMenu">
+                        <button class="user-menu-btn" id="userMenuBtn">
+                            <div class="user-avatar">
+                                <img src="https://ui-avatars.com/api/?name=U" alt="User" id="userAvatar">
+                            </div>
+                            <div class="user-info">
+                                <span class="user-name">Usuário</span>
+                                <span class="user-role">...</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="user-dropdown" id="userDropdown">
+                            <a href="/profile.html" class="dropdown-item">
+                                <i class="fas fa-user"></i>
+                                <span>Meu Perfil</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item logout-btn" id="logoutBtn">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Sair</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <main class="admin-panel">
+                    <div class="panel-header">
+                        <i class="fas fa-file-alt"></i>
+                        <h2>Log de Produtos</h2>
+                    </div>
+                    <p class="panel-description">Navegue por todos os dados brutos coletados do banco de dados. Use os filtros para encontrar produtos específicos.</p>
+
+                    <!-- Indicador de Desenvolvimento -->
+                    <div class="dev-notice">
+                        <div class="dev-content">
+                            <i class="fas fa-cog fa-spin"></i>
+                            <h3>Log de Produtos em Desenvolvimento</h3>
+                            <p>Estamos trabalhando para trazer uma visão completa de todos os produtos coletados com filtros avançados e exportação de dados.</p>
+                            <div class="dev-features">
+                                <span class="dev-badge">📋 Lista Completa</span>
+                                <span class="dev-badge">🔍 Filtros Avançados</span>
+                                <span class="dev-badge">📊 Visualizações</span>
+                                <span class="dev-badge">📤 Exportação</span>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+    
+    <script src="mobile-menu.js"></script>
+    <script src="user-menu.js"></script>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de Preços - Thunder Theme</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="designer.css">
+    <link rel="stylesheet" href="componentes.css">
+    <link rel="stylesheet" href="menu.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script src="menu.js"></script>
+    <script src="theme.js"></script>
+</head>
+<body class="theme-dark">
+    <script>
+        // Verifica autenticação e inicializa menu
+        document.addEventListener('DOMContentLoaded', async function() {
+            if (!await requireAuth()) return;
+            await initializeDynamicMenu();
+            await checkAccessExpiration();
+        });
+    </script>
+
+    <div class="app-container">
+        <aside class="sidebar" id="sidebarMenu">
+            <div class="sidebar-header">
+                <i class="fas fa-bolt"></i>
+                <h1>Preços AL</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                   <li class="nav-header">ANÁLISE</li>
+                    <li><a href="/search.html"><i class="fas fa-search"></i> Busca</a></li>
+                    <li data-required-permission="compare"><a href="/compare.html"><i class="fas fa-chart-bar"></i> Comparador</a></li>
+                    <li data-required-permission="dashboard"><a href="/dashboard.html"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+                    <li data-required-permission="baskets"><a href="/cesta.html"><i class="fas fa-shopping-basket"></i> Minhas Cestas</a></li>
+                    
+                    <li class="nav-header">ADMINISTRAÇÃO</li>
+                    <li data-required-permission="coleta"><a href="/admin.html"><i class="fas fa-database"></i> Coleta</a></li>
+                    <li data-required-permission="collections"><a href="/collections.html"><i class="fas fa-history"></i> Histórico de Coletas</a></li>
+                    <li data-required-permission="product_log"><a href="/product-log.html"><i class="fas fa-file-alt"></i> Log de Produtos</a></li>
+                    <li data-required-permission="user_logs"><a href="/user-logs.html"><i class="fas fa-user-clock"></i> Logs de Usuários</a></li>
+                    <li data-required-permission="prune"><a href="/prune.html"><i class="fas fa-broom"></i> Limpeza de Dados</a></li>
+
+                    <li class="nav-header">CONFIGURAÇÃO</li>
+                    <li data-required-permission="markets"><a href="/markets.html"><i class="fas fa-store"></i> Gerenciar Mercados</a></li>
+                    <li data-required-permission="users"><a href="/users.html"><i class="fas fa-users"></i> Gerenciar Usuários</a></li>
+                    <li data-required-permission="users"><a href="/group-admin-users.html"><i class="fas fa-layer-group"></i> Gerenciar Grupos</a></li>
+                    <li data-required-permission="users"><a href="/group-admin.html"><i class="fas fa-user-shield"></i> Subadministradores</a></li>
+                </ul>
+            </nav>
+            <div class="theme-switcher">
+                <span>Tema</span>
+                <button id="themeToggle" aria-label="Alternar tema">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-content">
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <button class="mobile-menu-btn" id="mobileMenuBtn">
+                        <span></span><span></span><span></span>
+                    </button>
+                </div>
+                <div class="top-bar-right">
+                    <div class="user-menu" id="userMenu">
+                        <button class="user-menu-btn" id="userMenuBtn">
+                            <div class="user-avatar">
+                                <img src="https://ui-avatars.com/api/?name=U" alt="User" id="userAvatar">
+                            </div>
+                            <div class="user-info">
+                                <span class="user-name">Usuário</span>
+                                <span class="user-role">...</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="user-dropdown" id="userDropdown">
+                            <a href="/profile.html" class="dropdown-item">
+                                <i class="fas fa-user"></i>
+                                <span>Meu Perfil</span>
+                            </a>
+                            <a href="/updates.html" class="dropdown-item">
+                                <i class="fas fa-sync-alt"></i>
+                                <span>Atualizações</span>
+                            </a>
+                            <a href="/faq.html" class="dropdown-item">
+                                <i class="fas fa-question-circle"></i>
+                                <span>FAQ</span>
+                            </a>
+                            <a href="/maintenance.html" class="dropdown-item">
+                                <i class="fas fa-tools"></i>
+                                <span>Manutenção</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item logout-btn" id="logoutBtn">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Sair</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <main class="admin-panel">
+                    <div class="panel-header">
+                        <i class="fas fa-search"></i>
+                        <h2>Busca de Produtos</h2>
+                    </div>
+                    <p class="panel-description">Encontre os melhores preços de forma rápida e intuitiva.</p>
+                    
+                    <div class="search-controls">
+                        <div class="search-input-group">
+                            <input type="text" id="searchInput" placeholder="Digite o nome do produto ou código de barras...">
+                            <button id="clearSearchButton" class="clear-search"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div class="search-buttons">
+                            <button id="searchButton" class="btn"><i class="fas fa-bolt"></i> Buscar em Tempo Real</button>
+                        </div>
+                        
+                        <details id="filters-details" class="market-filters" role="group" aria-labelledby="filters-toggle">
+                            <summary id="filters-toggle" role="button" aria-expanded="false" aria-controls="filters-container">
+                                <div class="summary-content">
+                                    <i class="fas fa-store" aria-hidden="true"></i> 
+                                    <span>Selecionar Supermercados</span>
+                                    <span class="selection-count" aria-live="polite">0 selecionados</span>
+                                </div>
+                            </summary>
+                            <div class="filters-container" id="filters-container">
+                                <div class="market-search-controls">
+                                    <div class="search-box">
+                                        <i class="fas fa-search" aria-hidden="true"></i>
+                                        <input type="text" id="marketSearchInput" placeholder="Pesquisar mercado por nome ou CNPJ..." aria-label="Pesquisar supermercados">
+                                        <button id="clearMarketSearch" class="clear-btn" aria-label="Limpar pesquisa">
+                                            <i class="fas fa-times" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <div class="selection-actions">
+                                        <button id="selectAllMarkets" class="btn small" aria-label="Selecionar todos os supermercados">
+                                            <i class="fas fa-check-double" aria-hidden="true"></i> Selecionar Todos
+                                        </button>
+                                        <button id="deselectAllMarkets" class="btn small outline" aria-label="Desmarcar todos os supermercados">
+                                            <i class="fas fa-times-circle" aria-hidden="true"></i> Limpar Seleção
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="supermarketFilters" class="supermarket-grid" role="list" aria-label="Lista de supermercados"></div>
+                            </div>
+                        </details>
+                    </div>
+                
+                    <div id="loader" class="loader-container" style="display: none;">
+                        <div class="loader"></div>
+                        <p>Buscando produtos...</p>
+                    </div>
+                    
+                    <div id="resultsFilters" class="admin-panel" style="display: none; margin-top: 2rem;">
+                        <div class="panel-header">
+                            <i class="fas fa-sliders-h"></i>
+                            <h3>Filtrar resultados</h3>
+                        </div>
+                        <div class="filter-controls">
+                            <div class="filter-group">
+                                <label for="marketFilter">Mercado:</label>
+                                <select id="marketFilter">
+                                    <option value="all">Todos os mercados</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="sortFilter">Ordenar por:</label>
+                                <select id="sortFilter">
+                                    <option value="recent">Mais recentes</option>
+                                    <option value="cheap">Preço: mais barato</option>
+                                    <option value="expensive">Preço: mais caro</option>
+                                    <option value="name">Nome do produto (A-Z)</option>
+                                </select>
+                            </div>
+                            <button id="clearFiltersButton" class="btn outline"><i class="fas fa-times"></i> Limpar Filtros</button>
+                        </div>
+                    </div>
+                    
+                    <div id="resultsGrid" class="results-grid"></div>
+                </main>
+            </div>
+        </div>
+    </div>
+    <script src="user-menu.js"></script>
+    <script src="script.js"></script>
+    <script src="user-activity-monitor.js"></script>
+    <script src="price-sorter.js"></script>
+</body>
+</html>

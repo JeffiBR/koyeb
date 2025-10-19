@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FASTPrice - Sistema de Análise de Preços</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* ====== VARIÁVEIS E ESTILOS GLOBAIS ====== */
+        :root {
+            /* Dark Theme */
+            --bg-dark: #0b1020;
+            --panel-dark: #0f1724;
+            --muted-dark: #9aa4b2;
+            --input-dark: #0b1220;
+            --border-dark: rgba(255,255,255,0.07);
+            --text-dark: #e6eef7;
+
+            /* Light Theme */
+            --bg-light: #f4f6fb;
+            --panel-light: #fff;
+            --muted-light: #4b5563;
+            --input-light: #f8fafc;
+            --border-light: #e6e9ef;
+            --text-light: #071028;
+
+            /* Common */
+            --primary: #4f46e5;
+            --accent: #7c3aed;
+            --success: #16a34a;
+            --warn: #f59e0b;
+            --error: #ef4444;
+
+            --radius: 14px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial;
+            background: var(--bg-dark);
+            color: var(--text-dark);
+            min-height: 100vh;
+            transition: var(--transition);
+            line-height: 1.6;
+        }
+
+        body.light-mode {
+            background: var(--bg-light);
+            color: var(--text-light);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* ====== HEADER E NAVEGAÇÃO ====== */
+        header {
+            background: var(--panel-dark);
+            border-bottom: 1px solid var(--border-dark);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            transition: var(--transition);
+        }
+
+        body.light-mode header {
+            background: var(--panel-light);
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            font-size: 1.5rem;
+        }
+
+        .logo-icon {
+            color: var(--primary);
+            font-size: 1.8rem;
+        }
+
+        .logo-text {
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+
+        nav a {
+            color: var(--muted-dark);
+            text-decoration: none;
+            font-weight: 500;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        body.light-mode nav a {
+            color: var(--muted-light);
+        }
+
+        nav a:hover {
+            color: var(--primary);
+        }
+
+        nav a::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: -5px;
+            left: 0;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            transition: var(--transition);
+        }
+
+        nav a:hover::after {
+            width: 100%;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .btn {
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            color: #fff; 
+            border: none; 
+            border-radius: var(--radius);
+            padding: 0.75rem 1.5rem; 
+            font-weight: 600; 
+            font-family: inherit;
+            box-shadow: 0 4px 15px rgba(79,70,229,0.15);
+            transition: var(--transition);
+            cursor: pointer;
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center;
+            gap: 8px;
+            position: relative; 
+            overflow: hidden;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            box-shadow: 0 8px 30px rgba(79,70,229,0.18);
+            transform: translateY(-2px);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-whatsapp {
+            background: transparent;
+            border: 2px solid #25D366;
+            color: #25D366;
+        }
+
+        .btn-whatsapp:hover {
+            background: #25D366;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .theme-toggle {
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            color: #fff; 
+            border: none; 
+            border-radius: 50%;
+            width: 40px; 
+            height: 40px; 
+            display: grid; 
+            place-items: center; 
+            cursor: pointer;
+            font-size: 1.3rem;
+            box-shadow: 0 8px 25px rgba(79, 70, 229, 0.4);
+            transition: var(--transition);
+        }
+
+        .theme-toggle:hover { 
+            transform: scale(1.1) rotate(15deg); 
+        }
+
+        /* ====== SEÇÃO HERO ====== */
+        .hero {
+            padding: 6rem 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            opacity: 0.03;
+            filter: blur(60px);
+            top: -100px;
+            right: -100px;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            background: linear-gradient(90deg, var(--accent), var(--primary));
+            opacity: 0.03;
+            filter: blur(60px);
+            bottom: -150px;
+            left: -150px;
+            z-index: -1;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            background-size: 300% 100%;
+            animation: shimmer 3s infinite linear;
+        }
+
+        @keyframes shimmer {
+            0%,100%{background-position:0% 50%}50%{background-position:100% 50%}
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--muted-dark);
+            max-width: 700px;
+            margin: 0 auto 2.5rem;
+        }
+
+        body.light-mode .hero p {
+            color: var(--muted-light);
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        /* ====== SEÇÃO DE RECURSOS ====== */
+        .features {
+            padding: 5rem 0;
+            background: var(--panel-dark);
+            border-radius: var(--radius);
+            margin: 2rem auto;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.light-mode .features {
+            background: var(--panel-light);
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .section-header p {
+            color: var(--muted-dark);
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        body.light-mode .section-header p {
+            color: var(--muted-light);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            padding: 2rem;
+            border: 1px solid var(--border-dark);
+            transition: var(--transition);
+            text-align: center;
+        }
+
+        body.light-mode .feature-card {
+            background: var(--bg-light);
+            border: 1px solid var(--border-light);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+
+        .feature-icon {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 1.8rem;
+            color: white;
+        }
+
+        .feature-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card p {
+            color: var(--muted-dark);
+        }
+
+        body.light-mode .feature-card p {
+            color: var(--muted-light);
+        }
+
+        /* ====== SEÇÃO DE DASHBOARD ====== */
+        .dashboard {
+            padding: 5rem 0;
+            position: relative;
+        }
+
+        .dashboard-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .date-filter {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .date-btn {
+            background: var(--panel-dark);
+            border: 1px solid var(--border-dark);
+            border-radius: var(--radius);
+            padding: 0.6rem 1.2rem;
+            color: var(--muted-dark);
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 500;
+        }
+
+        body.light-mode .date-btn {
+            background: var(--panel-light);
+            border: 1px solid var(--border-light);
+            color: var(--muted-light);
+        }
+
+        .date-btn.active {
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            color: white;
+            border-color: transparent;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+        }
+
+        .chart-container {
+            background: var(--panel-dark);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            border: 1px solid var(--border-dark);
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.light-mode .chart-container {
+            background: var(--panel-light);
+            border: 1px solid var(--border-light);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .chart-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .chart-action {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-dark);
+            border-radius: 8px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--muted-dark);
+            transition: var(--transition);
+        }
+
+        body.light-mode .chart-action {
+            background: var(--bg-light);
+            border: 1px solid var(--border-light);
+        }
+
+        .chart-action:hover {
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+
+        .chart-summary {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-dark);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        body.light-mode .chart-summary {
+            border-top: 1px solid var(--border-light);
+        }
+
+        .summary-item {
+            text-align: center;
+        }
+
+        .summary-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+        }
+
+        .summary-label {
+            font-size: 0.85rem;
+            color: var(--muted-dark);
+        }
+
+        body.light-mode .summary-label {
+            color: var(--muted-light);
+        }
+
+        /* ====== SEÇÃO DE INFORMAÇÕES ====== */
+        .info-section {
+            padding: 5rem 0;
+        }
+
+        .info-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .info-tab {
+            background: var(--panel-dark);
+            border: 1px solid var(--border-dark);
+            border-radius: var(--radius);
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 500;
+        }
+
+        body.light-mode .info-tab {
+            background: var(--panel-light);
+            border: 1px solid var(--border-light);
+        }
+
+        .info-tab.active {
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            color: white;
+            border-color: transparent;
+        }
+
+        .info-content {
+            background: var(--panel-dark);
+            border-radius: var(--radius);
+            padding: 2.5rem;
+            border: 1px solid var(--border-dark);
+        }
+
+        body.light-mode .info-content {
+            background: var(--panel-light);
+            border: 1px solid var(--border-light);
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tab-pane h3 {
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            color: var(--primary);
+        }
+
+        .tab-pane h4 {
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.8rem;
+        }
+
+        .tab-pane p, .tab-pane ul {
+            margin-bottom: 1rem;
+        }
+
+        .tab-pane ul {
+            padding-left: 1.5rem;
+        }
+
+        .tab-pane li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* ====== FOOTER ====== */
+        footer {
+            background: var(--panel-dark);
+            border-top: 1px solid var(--border-dark);
+            padding: 3rem 0 1.5rem;
+            margin-top: 4rem;
+        }
+
+        body.light-mode footer {
+            background: var(--panel-light);
+            border-top: 1px solid var(--border-light);
+        }
+
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .footer-column h3 {
+            font-size: 1.2rem;
+            margin-bottom: 1.5rem;
+            position: relative;
+            padding-bottom: 0.5rem;
+        }
+
+        .footer-column h3::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 40px;
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+        }
+
+        .footer-links {
+            list-style: none;
+        }
+
+        .footer-links li {
+            margin-bottom: 0.8rem;
+        }
+
+        .footer-links a {
+            color: var(--muted-dark);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        body.light-mode .footer-links a {
+            color: var(--muted-light);
+        }
+
+        .footer-links a:hover {
+            color: var(--primary);
+            padding-left: 5px;
+        }
+
+        .footer-bottom {
+            text-align: center;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-dark);
+            color: var(--muted-dark);
+        }
+
+        body.light-mode .footer-bottom {
+            border-top: 1px solid var(--border-light);
+            color: var(--muted-light);
+        }
+
+        /* ====== RESPONSIVIDADE ====== */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            nav ul {
+                gap: 1rem;
+            }
+
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero p {
+                font-size: 1.1rem;
+            }
+
+            .hero-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .dashboard-controls {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .info-tabs {
+                flex-direction: column;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .hero {
+                padding: 4rem 0;
+            }
+
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .section-header h2 {
+                font-size: 2rem;
+            }
+
+            .feature-card, .info-content, .chart-container {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-bolt logo-icon"></i>
+                    <span class="logo-text">FASTPrice</span>
+                </div>
+                
+                <nav>
+                    <ul>
+                        <li><a href="#sobre">Sobre</a></li>
+                        <li><a href="#recursos">Recursos</a></li>
+                        <li><a href="#dashboard">Dashboard</a></li>
+                        <li><a href="#politicas">Políticas</a></li>
+                    </ul>
+                </nav>
+                
+                <div class="header-actions">
+                    <button id="themeToggle" class="theme-toggle">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <a href="login.html" class="btn">
+                        <i class="fas fa-sign-in-alt"></i> Entrar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>Análise de Preços <span>Inteligente</span> e Rápida</h1>
+            <p>O FASTPrice é uma solução completa para análise e comparação de preços em tempo real, oferecendo insights valiosos para otimizar suas estratégias de precificação.</p>
+            <div class="hero-buttons">
+                <a href="login.html" class="btn">
+                    <i class="fas fa-rocket"></i> Começar Agora
+                </a>
+                <a href="https://wa.me/5582999158412?text=Olá! Gostaria de solicitar uma demonstração do FASTPrice." class="btn btn-whatsapp" target="_blank">
+                    <i class="fab fa-whatsapp"></i> Solicite uma Demonstração
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sobre -->
+    <section id="sobre" class="info-section">
+        <div class="container">
+            <div class="section-header">
+                <h2>Sobre o FASTPrice</h2>
+                <p>Conheça nossa plataforma e como ela pode transformar sua análise de preços</p>
+            </div>
+            
+            <div class="info-content">
+                <h3>O que é o FASTPrice?</h3>
+                <p>O FASTPrice é uma plataforma avançada de análise de preços desenvolvida para oferecer insights precisos e em tempo real sobre o mercado. Nossa solução combina tecnologia de ponta com uma interface intuitiva para ajudar empresas a otimizar suas estratégias de precificação.</p>
+                
+                <h4>Nossa Missão</h4>
+                <p>Fornecer ferramentas de análise de preços acessíveis e eficientes que permitam às empresas tomar decisões mais informadas, aumentando sua competitividade no mercado.</p>
+                
+                <h4>Como Funciona</h4>
+                <p>Através de algoritmos avançados e coleta de dados em tempo real, o FASTPrice analisa múltiplas fontes de informação para oferecer uma visão completa do cenário de preços, permitindo comparações e identificação de oportunidades.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Recursos -->
+    <section id="recursos" class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2>Recursos Principais</h2>
+                <p>Descubra as funcionalidades que tornam o FASTPrice a melhor escolha</p>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>Análise em Tempo Real</h3>
+                    <p>Monitore e analise preços do mercado em tempo real com atualizações constantes.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-balance-scale"></i>
+                    </div>
+                    <h3>Comparação Inteligente</h3>
+                    <p>Compare preços de diferentes fontes e identifique as melhores oportunidades.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <h3>Alertas Personalizados</h3>
+                    <p>Receba notificações quando preços atingirem os limites definidos por você.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h3>Histórico Completo</h3>
+                    <p>Acesse o histórico completo de preços para análises temporais detalhadas.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h3>Interface Responsiva</h3>
+                    <p>Acesse a plataforma de qualquer dispositivo com uma experiência otimizada.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3>Segurança de Dados</h3>
+                    <p>Seus dados são protegidos com as mais avançadas medidas de segurança.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dashboard -->
+    <section id="dashboard" class="dashboard">
+        <div class="container">
+            <div class="section-header">
+                <h2>Dashboard de Análises</h2>
+                <p>Visualize insights valiosos através de nossos gráficos interativos</p>
+            </div>
+            
+            <div class="dashboard-controls">
+                <div class="date-filter">
+                    <button class="date-btn active">7 Dias</button>
+                    <button class="date-btn">30 Dias</button>
+                    <button class="date-btn">3 Meses</button>
+                    <button class="date-btn">1 Ano</button>
+                </div>
+                <div>
+                    <button class="btn">
+                        <i class="fas fa-download"></i> Exportar Dados
+                    </button>
+                </div>
+            </div>
+            
+            <div class="dashboard-grid">
+                <!-- Gráfico de Linha - Evolução de Preços -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <div class="chart-title">Evolução de Preços</div>
+                        <div class="chart-actions">
+                            <div class="chart-action">
+                                <i class="fas fa-expand"></i>
+                            </div>
+                            <div class="chart-action">
+                                <i class="fas fa-download"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="priceEvolutionChart"></canvas>
+                    </div>
+                    <div class="chart-summary">
+                        <div class="summary-item">
+                            <div class="summary-value" id="avgPrice">R$ 124,50</div>
+                            <div class="summary-label">Preço Médio</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value" id="priceChange">+2,3%</div>
+                            <div class="summary-label">Variação</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value" id="maxPrice">R$ 145,90</div>
+                            <div class="summary-label">Preço Máximo</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Gráfico de Barras - Comparação de Concorrentes -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <div class="chart-title">Comparação com Concorrentes</div>
+                        <div class="chart-actions">
+                            <div class="chart-action">
+                                <i class="fas fa-expand"></i>
+                            </div>
+                            <div class="chart-action">
+                                <i class="fas fa-download"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="competitorsChart"></canvas>
+                    </div>
+                    <div class="chart-summary">
+                        <div class="summary-item">
+                            <div class="summary-value" id="position">2º</div>
+                            <div class="summary-label">Posição</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value" id="priceDiff">-R$ 5,20</div>
+                            <div class="summary-label">Diferença Média</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value" id="cheaperThan">75%</div>
+                            <div class="summary-label">Mais Barato Que</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Gráfico de Pizza - Distribuição de Categorias -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <div class="chart-title">Distribuição por Categoria</div>
+                        <div class="chart-actions">
+                            <div class="chart-action">
+                                <i class="fas fa-expand"></i>
+                            </div>
+                            <div class="chart-action">
+                                <i class="fas fa-download"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="categoriesChart"></canvas>
+                    </div>
+                    <div class="chart-summary">
+                        <div class="summary-item">
+                            <div class="summary-value" id="topCategory">Eletrônicos</div>
+                            <div class="summary-label">Categoria Principal</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value" id="categoryCount">12</div>
+                            <div class="summary-label">Categorias</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value" id="categoryShare">42%</div>
+                            <div class="summary-label">Participação</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Gráfico de Radar - Desempenho por Região -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <div class="chart-title">Desempenho por Região</div>
+                        <div class="chart-actions">
+                            <div class="chart-action">
+                                <i class="fas fa-expand"></i>
+                            </div>
+                            <div class="chart-action">
+                                <i class="fas fa-download"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="regionsChart"></canvas>
+                    </div>
+                    <div class="chart-summary">
+                        <div class="summary-item">
+                            <div class="summary-value" id="bestRegion">Sudeste</div>
+                            <div class="summary-label">Melhor Região</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value" id="regionGrowth">+15%</div>
+                            <div class="summary-label">Crescimento</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-value" id="regionShare">38%</div>
+                            <div class="summary-label">Participação</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-column">
+                    <h3>FASTPrice</h3>
+                    <p>Sistema avançado de análise e comparação de preços para otimizar suas estratégias de mercado.</p>
+                </div>
+                
+                <div class="footer-column">
+                    <h3>Políticas</h3>
+                    <ul class="footer-links">
+                        <li><a href="#politicas" data-tab="politica-uso">Política de Uso</a></li>
+                        <li><a href="#politicas" data-tab="politica-cookies">Política de Cookies</a></li>
+                        <li><a href="#politicas" data-tab="termos-uso">Termos de Uso</a></li>
+                        <li><a href="#politicas" data-tab="privacidade">Política de Privacidade</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-column">
+                    <h3>Contato</h3>
+                    <ul class="footer-links">
+                        <li><i class="fas fa-envelope"></i> contato@fastprice.com</li>
+                        <li><i class="fas fa-phone"></i> (82) 99999-9999</li>
+                        <li><i class="fas fa-map-marker-alt"></i> Maceió, AL - Brasil</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2025 FASTPrice. Todos os direitos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tema claro/escuro
+            const themeToggle = document.getElementById('themeToggle');
+            const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
+            
+            // Verificar preferência salva ou do sistema
+            const savedTheme = localStorage.getItem('theme');
+            const systemTheme = prefersDarkScheme.matches ? 'dark' : 'light';
+            const currentTheme = savedTheme || systemTheme;
+            
+            // Aplicar tema
+            if (currentTheme === 'light') {
+                document.body.classList.add('light-mode');
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+            } else {
+                themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+            }
+            
+            // Alternar tema
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('light-mode');
+                const isLight = document.body.classList.contains('light-mode');
+                localStorage.setItem('theme', isLight ? 'light' : 'dark');
+                themeToggle.innerHTML = isLight ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+                
+                // Atualizar gráficos quando o tema mudar
+                updateChartsTheme();
+            });
+
+            // Sistema de abas para as políticas
+            const infoTabs = document.querySelectorAll('.info-tab');
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            
+            infoTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Remover classe ativa de todas as abas
+                    infoTabs.forEach(t => t.classList.remove('active'));
+                    // Adicionar classe ativa à aba clicada
+                    tab.classList.add('active');
+                    
+                    // Esconder todos os painéis
+                    tabPanes.forEach(pane => pane.classList.remove('active'));
+                    
+                    // Mostrar o painel correspondente
+                    const tabId = tab.getAttribute('data-tab');
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+
+            // Navegação suave para âncoras
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const targetId = this.getAttribute('href');
+                    if (targetId === '#') return;
+                    
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        // Verificar se é um link de política no footer
+                        if (this.hasAttribute('data-tab')) {
+                            const tabId = this.getAttribute('data-tab');
+                            // Ativar a aba correspondente
+                            infoTabs.forEach(t => t.classList.remove('active'));
+                            document.querySelector(`.info-tab[data-tab="${tabId}"]`).classList.add('active');
+                            
+                            // Mostrar o painel correspondente
+                            tabPanes.forEach(pane => pane.classList.remove('active'));
+                            document.getElementById(tabId).classList.add('active');
+                        }
+                        
+                        window.scrollTo({
+                            top: targetElement.offsetTop - 80,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+
+            // Filtros de data do dashboard
+            const dateButtons = document.querySelectorAll('.date-btn');
+            dateButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    dateButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    // Aqui você poderia atualizar os gráficos com base no período selecionado
+                });
+            });
+
+            // Configuração dos gráficos
+            let priceEvolutionChart, competitorsChart, categoriesChart, regionsChart;
+            
+            function initCharts() {
+                // Gráfico de Linha - Evolução de Preços
+                const priceCtx = document.getElementById('priceEvolutionChart').getContext('2d');
+                priceEvolutionChart = new Chart(priceCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'],
+                        datasets: [{
+                            label: 'Preço Médio',
+                            data: [120, 125, 122, 130, 128, 135, 140],
+                            borderColor: '#4f46e5',
+                            backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4
+                        }, {
+                            label: 'Preço Mínimo',
+                            data: [115, 118, 116, 120, 119, 125, 130],
+                            borderColor: '#10b981',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + value;
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Gráfico de Barras - Comparação de Concorrentes
+                const competitorsCtx = document.getElementById('competitorsChart').getContext('2d');
+                competitorsChart = new Chart(competitorsCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Concorrente A', 'Concorrente B', 'Concorrente C', 'Concorrente D', 'FASTPrice', 'Concorrente E'],
+                        datasets: [{
+                            label: 'Preço do Produto',
+                            data: [150, 145, 160, 135, 140, 155],
+                            backgroundColor: [
+                                'rgba(79, 70, 229, 0.7)',
+                                'rgba(79, 70, 229, 0.7)',
+                                'rgba(79, 70, 229, 0.7)',
+                                'rgba(79, 70, 229, 0.7)',
+                                'rgba(124, 58, 237, 1)',
+                                'rgba(79, 70, 229, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(79, 70, 229, 1)',
+                                'rgba(79, 70, 229, 1)',
+                                'rgba(79, 70, 229, 1)',
+                                'rgba(79, 70, 229, 1)',
+                                'rgba(124, 58, 237, 1)',
+                                'rgba(79, 70, 229, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + value;
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Gráfico de Pizza - Distribuição de Categorias
+                const categoriesCtx = document.getElementById('categoriesChart').getContext('2d');
+                categoriesChart = new Chart(categoriesCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Eletrônicos', 'Vestuário', 'Casa e Decoração', 'Beleza', 'Livros', 'Outros'],
+                        datasets: [{
+                            data: [42, 18, 15, 12, 8, 5],
+                            backgroundColor: [
+                                'rgba(79, 70, 229, 0.8)',
+                                'rgba(124, 58, 237, 0.8)',
+                                'rgba(139, 92, 246, 0.8)',
+                                'rgba(168, 85, 247, 0.8)',
+                                'rgba(192, 132, 252, 0.8)',
+                                'rgba(216, 180, 254, 0.8)'
+                            ],
+                            borderColor: [
+                                'rgba(79, 70, 229, 1)',
+                                'rgba(124, 58, 237, 1)',
+                                'rgba(139, 92, 246, 1)',
+                                'rgba(168, 85, 247, 1)',
+                                'rgba(192, 132, 252, 1)',
+                                'rgba(216, 180, 254, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right'
+                            }
+                        },
+                        cutout: '60%'
+                    }
+                });
+
+                // Gráfico de Radar - Desempenho por Região
+                const regionsCtx = document.getElementById('regionsChart').getContext('2d');
+                regionsChart = new Chart(regionsCtx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['Preço Competitivo', 'Disponibilidade', 'Velocidade de Venda', 'Satisfação do Cliente', 'Margem de Lucro', 'Crescimento'],
+                        datasets: [{
+                            label: 'Sudeste',
+                            data: [85, 90, 80, 75, 70, 85],
+                            backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                            borderColor: 'rgba(79, 70, 229, 1)',
+                            borderWidth: 2,
+                            pointBackgroundColor: 'rgba(79, 70, 229, 1)'
+                        }, {
+                            label: 'Nordeste',
+                            data: [70, 65, 75, 80, 65, 70],
+                            backgroundColor: 'rgba(124, 58, 237, 0.2)',
+                            borderColor: 'rgba(124, 58, 237, 1)',
+                            borderWidth: 2,
+                            pointBackgroundColor: 'rgba(124, 58, 237, 1)'
+                        }, {
+                            label: 'Sul',
+                            data: [80, 75, 85, 70, 80, 75],
+                            backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                            borderColor: 'rgba(139, 92, 246, 1)',
+                            borderWidth: 2,
+                            pointBackgroundColor: 'rgba(139, 92, 246, 1)'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                angleLines: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                pointLabels: {
+                                    color: 'rgba(255, 255, 255, 0.7)'
+                                },
+                                ticks: {
+                                    display: false,
+                                    max: 100
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Inicializar gráficos
+            initCharts();
+
+            // Atualizar tema dos gráficos
+            function updateChartsTheme() {
+                const isLight = document.body.classList.contains('light-mode');
+                const gridColor = isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+                const textColor = isLight ? '#071028' : '#e6eef7';
+                
+                // Atualizar todos os gráficos
+                [priceEvolutionChart, competitorsChart, categoriesChart, regionsChart].forEach(chart => {
+                    if (chart) {
+                        chart.options.scales.x.grid.color = gridColor;
+                        chart.options.scales.y.grid.color = gridColor;
+                        
+                        if (chart.options.scales.r) {
+                            chart.options.scales.r.angleLines.color = gridColor;
+                            chart.options.scales.r.grid.color = gridColor;
+                            chart.options.scales.r.pointLabels.color = textColor;
+                        }
+                        
+                        chart.update();
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

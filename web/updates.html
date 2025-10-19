@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atualizações do Sistema - Thunder Theme</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="designer.css">
+    <link rel="stylesheet" href="componentes.css">
+    <link rel="stylesheet" href="menu.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script src="menu.js"></script>
+    <script src="theme.js"></script>
+</head>
+<body class="theme-dark">
+    <script>
+        // Verifica autenticação e inicializa menu
+        document.addEventListener('DOMContentLoaded', async function() {
+            if (!await requireAuth()) return;
+            await initializeDynamicMenu();
+            await checkAccessExpiration();
+        });
+    </script>
+
+    <div class="app-container">
+        <aside class="sidebar" id="sidebarMenu">
+            <div class="sidebar-header">
+                <i class="fas fa-bolt"></i>
+                <h1>Preços AL</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="nav-header">ANÁLISE</li>
+                    <li><a href="/search.html"><i class="fas fa-search"></i> Busca</a></li>
+                    <li data-required-permission="compare"><a href="/compare.html"><i class="fas fa-chart-bar"></i> Comparador</a></li>
+                    <li data-required-permission="dashboard"><a href="/dashboard.html"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+                    <li data-required-permission="baskets"><a href="/cesta.html"><i class="fas fa-shopping-basket"></i> Minhas Cestas</a></li>
+                    
+                    <li class="nav-header">ADMINISTRAÇÃO</li>
+                    <li data-required-permission="coleta"><a href="/admin.html"><i class="fas fa-database"></i> Coleta</a></li>
+                    <li data-required-permission="collections"><a href="/collections.html"><i class="fas fa-history"></i> Histórico de Coletas</a></li>
+                    <li data-required-permission="product_log"><a href="/product-log.html"><i class="fas fa-file-alt"></i> Log de Produtos</a></li>
+                    <li data-required-permission="user_logs"><a href="/user-logs.html"><i class="fas fa-user-clock"></i> Logs de Usuários</a></li>
+                    <li data-required-permission="prune"><a href="/prune.html"><i class="fas fa-broom"></i> Limpeza de Dados</a></li>
+
+                    <li class="nav-header">CONFIGURAÇÃO</li>
+                    <li data-required-permission="markets"><a href="/markets.html"><i class="fas fa-store"></i> Gerenciar Mercados</a></li>
+                    <li data-required-permission="users"><a href="/users.html"><i class="fas fa-users"></i> Gerenciar Usuários</a></li>
+                    <li data-required-permission="users"><a href="/group-admin-users.html"><i class="fas fa-layer-group"></i> Gerenciar Grupos</a></li>
+                    <li data-required-permission="users"><a href="/group-admin.html"><i class="fas fa-user-shield"></i> Subadministradores</a></li>
+                    <li><a href="/updates.html" class="active"><i class="fas fa-sync-alt"></i> Atualizações</a></li>
+                </ul>
+            </nav>
+            <div class="theme-switcher">
+                <span>Tema</span>
+                <button id="themeToggle" aria-label="Alternar tema">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-content">
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <button class="mobile-menu-btn" id="mobileMenuBtn">
+                        <span></span><span></span><span></span>
+                    </button>
+                </div>
+                <div class="top-bar-right">
+                    <div class="user-menu" id="userMenu">
+                        <button class="user-menu-btn" id="userMenuBtn">
+                            <div class="user-avatar">
+                                <img src="https://ui-avatars.com/api/?name=U" alt="User" id="userAvatar">
+                            </div>
+                            <div class="user-info">
+                                <span class="user-name">Usuário</span>
+                                <span class="user-role">...</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="user-dropdown" id="userDropdown">
+                            <a href="/profile.html" class="dropdown-item">
+                                <i class="fas fa-user"></i>
+                                <span>Meu Perfil</span>
+                            </a>
+                            <a href="/updates.html" class="dropdown-item">
+                                <i class="fas fa-sync-alt"></i>
+                                <span>Atualizações</span>
+                            </a>
+                            <a href="/faq.html" class="dropdown-item">
+                                <i class="fas fa-question-circle"></i>
+                                <span>FAQ</span>
+                            </a>
+                            <a href="/maintenance.html" class="dropdown-item">
+                                <i class="fas fa-tools"></i>
+                                <span>Manutenção</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item logout-btn" id="logoutBtn">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Sair</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <main class="admin-panel">
+                    <div class="panel-header">
+                        <i class="fas fa-sync-alt"></i>
+                        <h2>Atualizações do Sistema</h2>
+                    </div>
+                    <p class="panel-description">Acompanhe as últimas mudanças e melhorias implementadas no sistema desde o lançamento.</p>
+                    
+                    <!-- Container de atualizações com accordion -->
+                    <div class="updates-accordion">
+                        <!-- Versão Novembro 2025 -->
+                        <details class="update-item" open>
+                            <summary class="update-header">
+                                <div class="update-summary">
+                                    <div class="version-info">
+                                        <span class="version-number">v1.3.0</span>
+                                        <span class="version-date">15 de Novembro 2025</span>
+                                    </div>
+                                    <div class="version-status">
+                                        <span class="status-badge status-active">Atual</span>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-down indicator"></i>
+                            </summary>
+                            <div class="update-content">
+                                <div class="changelog-section">
+                                    <h3><i class="fas fa-plus-circle"></i> Novas Funcionalidades</h3>
+                                    <ul class="changelog-list">
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            Sistema de subadministradores para gerenciamento de grupos
+                                        </li>
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            Permissões granulares para subadministradores
+                                        </li>
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            Endpoints específicos para gerenciamento de usuários por grupo
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="changelog-section">
+                                    <h3><i class="fas fa-wrench"></i> Melhorias</h3>
+                                    <ul class="changelog-list">
+                                        <li>
+                                            <span class="change-tag improvement">MELHORIA</span>
+                                            Aprimoramento do sistema de permissões hierárquicas
+                                        </li>
+                                        <li>
+                                            <span class="change-tag improvement">MELHORIA</span>
+                                            Otimização de consultas ao banco de dados
+                                        </li>
+                                        <li>
+                                            <span class="change-tag improvement">MELHORIA</span>
+                                            Interface de gerenciamento de grupos mais intuitiva
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="changelog-section">
+                                    <h3><i class="fas fa-bug"></i> Correções</h3>
+                                    <ul class="changelog-list">
+                                        <li>
+                                            <span class="change-tag fix">CORREÇÃO</span>
+                                            Correção de validação de permissões em endpoints de usuários
+                                        </li>
+                                        <li>
+                                            <span class="change-tag fix">CORREÇÃO</span>
+                                            Ajuste na lógica de verificação de acesso expirado
+                                        </li>
+                                        <li>
+                                            <span class="change-tag fix">CORREÇÃO</span>
+                                            Correção de mensagens de erro em operações de grupo
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </details>
+
+                        <!-- Versão Outubro 2025 -->
+                        <details class="update-item">
+                            <summary class="update-header">
+                                <div class="update-summary">
+                                    <div class="version-info">
+                                        <span class="version-number">v1.2.0</span>
+                                        <span class="version-date">20 de Outubro 2025</span>
+                                    </div>
+                                    <div class="version-status">
+                                        <span class="status-badge status-pending">Anterior</span>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-down indicator"></i>
+                            </summary>
+                            <div class="update-content">
+                                <div class="changelog-section">
+                                    <h3><i class="fas fa-plus-circle"></i> Novas Funcionalidades</h3>
+                                    <ul class="changelog-list">
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            Sistema de grupos de usuários
+                                        </li>
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            Controle de acesso baseado em data de expiração
+                                        </li>
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            Endpoints para gerenciamento de associações usuário-grupo
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="changelog-section">
+                                    <h3><i class="fas fa-wrench"></i> Melhorias</h3>
+                                    <ul class="changelog-list">
+                                        <li>
+                                            <span class="change-tag improvement">MELHORIA</span>
+                                            Aprimoramento do sistema de autenticação
+                                        </li>
+                                        <li>
+                                            <span class="change-tag improvement">MELHORIA</span>
+                                            Otimização de consultas ao banco de dados
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </details>
+
+                        <!-- Versão Setembro 2025 -->
+                        <details class="update-item">
+                            <summary class="update-header">
+                                <div class="update-summary">
+                                    <div class="version-info">
+                                        <span class="version-number">v1.1.0</span>
+                                        <span class="version-date">12 de Setembro 2025</span>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-down indicator"></i>
+                            </summary>
+                            <div class="update-content">
+                                <div class="changelog-section">
+                                    <h3><i class="fas fa-plus-circle"></i> Novas Funcionalidades</h3>
+                                    <ul class="changelog-list">
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            Sistema de cestas básicas personalizadas
+                                        </li>
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            Comparação de preços em tempo real para cestas
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="changelog-section">
+                                    <h3><i class="fas fa-wrench"></i> Melhorias</h3>
+                                    <ul class="changelog-list">
+                                        <li>
+                                            <span class="change-tag improvement">MELHORIA</span>
+                                            Aprimoramento da interface de comparação de preços
+                                        </li>
+                                        <li>
+                                            <span class="change-tag improvement">MELHORIA</span>
+                                            Otimização de consultas ao banco de dados
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="changelog-section">
+                                    <h3><i class="fas fa-bug"></i> Correções</h3>
+                                    <ul class="changelog-list">
+                                        <li>
+                                            <span class="change-tag fix">CORREÇÃO</span>
+                                            Correção de validação de dados de produtos
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </details>
+
+                        <!-- Versão Agosto 2025 -->
+                        <details class="update-item">
+                            <summary class="update-header">
+                                <div class="update-summary">
+                                    <div class="version-info">
+                                        <span class="version-number">v1.0.0</span>
+                                        <span class="version-date">17 de Agosto 2025</span>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-down indicator"></i>
+                            </summary>
+                            <div class="update-content">
+                                <div class="changelog-section">
+                                    <h3><i class="fas fa-plus-circle"></i> Lançamento Inicial</h3>
+                                    <ul class="changelog-list">
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            Sistema completo de coleta de preços de supermercados
+                                        </li>
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            API REST para consulta e gerenciamento de dados
+                                        </li>
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            Interface administrativa com dashboard
+                                        </li>
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            Sistema de autenticação e autorização
+                                        </li>
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            Módulo de busca e comparação de preços
+                                        </li>
+                                        <li>
+                                            <span class="change-tag new">NOVO</span>
+                                            Gerenciamento de usuários e permissões
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+    <script src="user-menu.js"></script>
+    <script src="user-activity-monitor.js"></script>
+    
+    <style>
+        /* Estilos específicos para a página de atualizações */
+        .updates-accordion {
+            margin-top: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .update-item {
+            background: var(--panel-dark);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-dark);
+            overflow: hidden;
+            transition: var(--transition);
+            box-shadow: 0 5px 28px rgba(0,0,0,0.13);
+        }
+        
+        body.light-mode .update-item {
+            background: var(--panel-light);
+            border: 1px solid var(--border-light);
+        }
+        
+        .update-item:hover {
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        .update-item[open] {
+            border-color: var(--primary);
+            box-shadow: 0 10px 40px rgba(79, 70, 229, 0.15);
+        }
+        
+        .update-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            cursor: pointer;
+            background: linear-gradient(90deg, rgba(79, 70, 229, 0.05), rgba(124, 58, 237, 0.05));
+            border-bottom: 1px solid transparent;
+            transition: var(--transition);
+            list-style: none;
+        }
+        
+        .update-item[open] .update-header {
+            border-bottom: 1px solid var(--border-dark);
+            background: linear-gradient(90deg, rgba(79, 70, 229, 0.08), rgba(124, 58, 237, 0.08));
+        }
+        
+        body.light-mode .update-item[open] .update-header {
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .update-header:hover {
+            background: linear-gradient(90deg, rgba(79, 70, 229, 0.1), rgba(124, 58, 237, 0.1));
+        }
+        
+        .update-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        
+        .version-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        
+        .version-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .version-date {
+            font-size: 0.9rem;
+            color: var(--muted-dark);
+        }
+        
+        body.light-mode .version-date {
+            color: var(--muted-light);
+        }
+        
+        .indicator {
+            color: var(--muted-dark);
+            transition: var(--transition);
+            font-size: 1.2rem;
+        }
+        
+        .update-item[open] .indicator {
+            transform: rotate(180deg);
+            color: var(--primary);
+        }
+        
+        .update-content {
+            padding: 2rem;
+            animation: slideDown 0.3s ease-out;
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .changelog-section {
+            margin-bottom: 2rem;
+        }
+        
+        .changelog-section:last-child {
+            margin-bottom: 0;
+        }
+        
+        .changelog-section h3 {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-dark);
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-dark);
+        }
+        
+        body.light-mode .changelog-section h3 {
+            color: var(--text-light);
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .changelog-section h3 i {
+            color: var(--primary);
+        }
+        
+        .changelog-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .changelog-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-dark);
+        }
+        
+        body.light-mode .changelog-list li {
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .changelog-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .change-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+            margin-top: 0.125rem;
+            flex-shrink: 0;
+        }
+        
+        .change-tag.new {
+            background: rgba(22, 163, 74, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(22, 163, 74, 0.3);
+        }
+        
+        .change-tag.improvement {
+            background: rgba(79, 70, 229, 0.15);
+            color: var(--primary);
+            border: 1px solid rgba(79, 70, 229, 0.3);
+        }
+        
+        .change-tag.fix {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warn);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        
+        .change-tag.security {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--error);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        
+        /* Remover o marcador padrão do details */
+        .update-item summary::-webkit-details-marker {
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .update-header {
+                padding: 1.25rem 1.5rem;
+            }
+            
+            .update-content {
+                padding: 1.5rem;
+            }
+            
+            .update-summary {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            
+            .version-status {
+                align-self: flex-end;
+            }
+            
+            .changelog-list li {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .change-tag {
+                align-self: flex-start;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .update-header {
+                padding: 1rem;
+            }
+            
+            .update-content {
+                padding: 1rem;
+            }
+            
+            .version-number {
+                font-size: 1.25rem;
+            }
+        }
+    </style>
+    
+    <script>
+        // Adicionar interação para abrir apenas um item por vez
+        document.addEventListener('DOMContentLoaded', function() {
+            const updateItems = document.querySelectorAll('.update-item');
+            
+            updateItems.forEach(item => {
+                item.addEventListener('toggle', function() {
+                    if (this.open) {
+                        // Fechar outros itens abertos
+                        updateItems.forEach(otherItem => {
+                            if (otherItem !== this && otherItem.open) {
+                                otherItem.open = false;
+                            }
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

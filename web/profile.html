@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Perfil - Sistema de Preços</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="designer.css">
+    <link rel="stylesheet" href="componentes.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script src="menu.js"></script>
+    <script src="user-menu.js"></script>
+    <script src="theme.js"></script>
+</head>
+<body class="theme-dark">
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            if (!await requireAuth()) return;
+            await initializeDynamicMenu();
+            await checkAccessExpiration();
+        });
+    </script>
+
+    <div class="app-container">
+        <aside class="sidebar" id="sidebarMenu">
+            <div class="sidebar-header">
+                <i class="fas fa-bolt"></i>
+                <h1>Preços AL</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                   <li class="nav-header">ANÁLISE</li>
+                    <li><a href="/search.html"><i class="fas fa-search"></i> Busca</a></li>
+                    <li data-required-permission="compare"><a href="/compare.html"><i class="fas fa-chart-bar"></i> Comparador</a></li>
+                    <li data-required-permission="dashboard"><a href="/dashboard.html"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+                    <li data-required-permission="baskets"><a href="/cesta.html"><i class="fas fa-shopping-basket"></i> Minhas Cestas</a></li>
+                    
+                    <li class="nav-header">ADMINISTRAÇÃO</li>
+                    <li data-required-permission="coleta"><a href="/admin.html"><i class="fas fa-database"></i> Coleta</a></li>
+                    <li data-required-permission="collections"><a href="/collections.html"><i class="fas fa-history"></i> Histórico de Coletas</a></li>
+                    <li data-required-permission="product_log"><a href="/product-log.html"><i class="fas fa-file-alt"></i> Log de Produtos</a></li>
+                    <li data-required-permission="user_logs"><a href="/user-logs.html"><i class="fas fa-user-clock"></i> Logs de Usuários</a></li>
+                    <li data-required-permission="prune"><a href="/prune.html"><i class="fas fa-broom"></i> Limpeza de Dados</a></li>
+
+                    <li class="nav-header">CONFIGURAÇÃO</li>
+                    <li data-required-permission="markets"><a href="/markets.html"><i class="fas fa-store"></i> Gerenciar Mercados</a></li>
+                    <li data-required-permission="users"><a href="/users.html"><i class="fas fa-users"></i> Gerenciar Usuários</a></li>
+                    <li data-required-permission="users"><a href="/group-admin-users.html"><i class="fas fa-layer-group"></i> Gerenciar Grupos</a></li>
+                    <li data-required-permission="users"><a href="/group-admin.html"><i class="fas fa-user-shield"></i> Subadministradores</a></li>
+                </ul>
+            </nav>
+            <div class="theme-switcher">
+                <span>Tema</span>
+                <button id="themeToggle" aria-label="Alternar tema">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-content">
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <button class="mobile-menu-btn" id="mobileMenuBtn">
+                        <span></span><span></span><span></span>
+                    </button>
+                </div>
+                <div class="top-bar-right">
+                    <div class="user-menu" id="userMenu">
+                        <button class="user-menu-btn" id="userMenuBtn">
+                            <div class="user-avatar">
+                                <img src="https://ui-avatars.com/api/?name=U" alt="User" id="userAvatar">
+                            </div>
+                            <div class="user-info">
+                                <span class="user-name">Usuário</span>
+                                <span class="user-role">...</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="user-dropdown" id="userDropdown">
+                            <a href="/profile.html" class="dropdown-item">
+                                <i class="fas fa-user"></i>
+                                <span>Meu Perfil</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item logout-btn" id="logoutBtn">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Sair</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <main class="admin-panel">
+                    <div class="panel-header">
+                        <i class="fas fa-user"></i>
+                        <h2>Meu Perfil</h2>
+                    </div>
+                    <p class="panel-description">Gerencie suas informações pessoais, credenciais e preferências.</p>
+                    
+                    <div class="profile-container">
+                        <!-- Cabeçalho do Perfil -->
+                        <div class="profile-header">
+                            <div class="profile-avatar">
+                                <img src="https://ui-avatars.com/api/?name=U" alt="Avatar atual" id="currentAvatar">
+                                <div class="avatar-overlay" id="avatarOverlay">
+                                    <i class="fas fa-camera"></i>
+                                </div>
+                            </div>
+                            <div class="profile-info">
+                                <h1 class="profile-name" id="profileDisplayName">Usuário</h1>
+                                <p class="profile-role" id="profileDisplayRole">Cargo/Função</p>
+                                <div class="profile-email">
+                                    <i class="fas fa-envelope"></i>
+                                    <span id="profileDisplayEmail">seu.email@exemplo.com</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Seção de Informações Pessoais -->
+                        <div class="form-section">
+                            <h3><i class="fas fa-id-card"></i> Informações Pessoais</h3>
+                            <div class="form-container">
+                                <div class="form-group">
+                                    <label for="fullName">Nome Completo *</label>
+                                    <input type="text" id="fullName" required placeholder="Digite seu nome completo">
+                                </div>
+                                <div class="form-group">
+                                    <label for="jobTitle">Cargo / Função</label>
+                                    <input type="text" id="jobTitle" placeholder="Ex: Analista de Preços, Gerente Comercial">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Seção de Foto de Perfil -->
+                        <div class="form-section">
+                            <h3><i class="fas fa-camera"></i> Foto de Perfil</h3>
+                            <div class="avatar-management">
+                                <div class="current-avatar">
+                                    <img src="https://ui-avatars.com/api/?name=U" alt="Avatar atual" id="currentAvatar">
+                                    <div class="avatar-actions">
+                                        <button type="button" id="removeAvatarBtn" class="remove-btn danger-gradient floating-3d remove-btn-tooltip">
+                                            <i class="fas fa-trash-alt"></i> Remover Foto
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="avatar-upload-container">
+                                    <div class="upload-container">
+                                        <div class="upload-area" id="uploadArea">
+                                            <div class="upload-icon">
+                                                <i class="fas fa-cloud-upload-alt"></i>
+                                            </div>
+                                            
+                                            <div class="upload-text">
+                                                <h3>Arraste e solte sua foto aqui</h3>
+                                                <p>ou clique no botão abaixo para procurar</p>
+                                            </div>
+                                            
+                                            <button class="browse-btn" id="browseBtn">
+                                                <i class="fas fa-folder-open"></i>
+                                                Escolher arquivo
+                                            </button>
+                                            
+                                            <input type="file" id="avatarFile" class="file-input" accept="image/jpeg,image/png,image/gif">
+                                            
+                                            <div class="drag-overlay">
+                                                <div class="drag-text">
+                                                    <i class="fas fa-cloud-upload-alt"></i> Solte a imagem aqui
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="file-info" id="fileInfo" style="display: none;">
+                                            <i class="fas fa-file-image"></i>
+                                            <span class="file-name" id="fileName">Nenhum arquivo escolhido</span>
+                                            <span class="file-size" id="fileSize"></span>
+                                            <button class="file-remove" id="fileRemove">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="progress-bar" id="progressBar">
+                                            <div class="progress-fill" id="progressFill"></div>
+                                        </div>
+                                        
+                                        <div class="success-message" id="successMessage">
+                                            <i class="fas fa-check-circle"></i>
+                                            <span>Foto de perfil atualizada com sucesso!</span>
+                                        </div>
+                                        
+                                        <div class="error-message" id="errorMessage">
+                                            <i class="fas fa-exclamation-circle"></i>
+                                            <span id="errorText">Erro ao carregar a imagem. Tente novamente.</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="preview-container" id="previewContainer">
+                                        <span class="preview-label">Pré-visualização</span>
+                                        <img src="https://via.placeholder.com/150/0b1020/4f46e5?text=Preview" alt="Pré-visualização" class="preview-image" id="previewImage">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Seção de Credenciais -->
+                        <div class="form-section">
+                            <h3><i class="fas fa-lock"></i> Segurança e Credenciais</h3>
+                            <div class="form-container">
+                                <div class="form-group">
+                                    <label for="email">E-mail *</label>
+                                    <input type="email" id="email" required placeholder="seu.email@exemplo.com">
+                                </div>
+                                <div class="password-fields">
+                                    <div class="form-group">
+                                        <label for="currentPassword">Senha Atual</label>
+                                        <input type="password" id="currentPassword" placeholder="Digite sua senha atual para alterações">
+                                        <button type="button" id="toggleCurrentPassword" class="btn-password-toggle">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <small>Necessária apenas para alterar e-mail ou senha</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="newPassword">Nova Senha</label>
+                                        <input type="password" id="newPassword" placeholder="Mínimo 6 caracteres">
+                                        <button type="button" id="toggleNewPassword" class="btn-password-toggle">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <small>Deixe em branco para manter a senha atual</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="confirmPassword">Confirmar Nova Senha</label>
+                                        <input type="password" id="confirmPassword" placeholder="Repita a nova senha">
+                                        <button type="button" id="toggleConfirmPassword" class="btn-password-toggle">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botões de Ação -->
+                        <div class="form-actions">
+                            <button id="updateProfileBtn" class="btn-primary full-width">
+                                <i class="fas fa-save"></i> Salvar Todas as Alterações
+                            </button>
+                            <button id="discardChangesBtn" class="btn-outline full-width" style="display: none;">
+                                <i class="fas fa-times"></i> Descartar Alterações
+                            </button>
+                        </div>
+
+                        <div id="uploadStatus" class="status-message"></div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <script src="mobile-menu.js"></script>
+    <script src="user-menu.js"></script>
+    <script src="user-activity-monitor.js"></script>
+    <script src="profile.js"></script>
+</body>
+</html>

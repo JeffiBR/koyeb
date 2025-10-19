@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas Cestas Básicas - Comparador de Preços</title>
+
+    <!-- Fontes e ícones -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="designer.css">
+    <link rel="stylesheet" href="style-cesta-updated.css">
+    
+
+    <!-- Scripts globais -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script src="menu.js"></script>
+    <script src="theme.js"></script>
+    <script src="user-menu.js"></script>
+</head>
+<body class="theme-dark">
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            if (!await requireAuth()) return;
+            await initializeDynamicMenu();
+            await checkAccessExpiration();
+            routeGuard('baskets');
+        });
+    </script>
+
+    <div class="app-container">
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebarMenu">
+            <div class="sidebar-header">
+                <i class="fas fa-bolt"></i>
+                <h1>Preços AL</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="nav-header">ANÁLISE</li>
+                    <li><a href="/search.html"><i class="fas fa-search"></i> Busca</a></li>
+                    <li data-required-permission="compare"><a href="/compare.html"><i class="fas fa-chart-bar"></i> Comparador</a></li>
+                    <li data-required-permission="dashboard"><a href="/dashboard.html"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+                    <li data-required-permission="baskets"><a href="/cesta.html"><i class="fas fa-shopping-basket"></i> Minhas Cestas</a></li>
+                    
+                    <li class="nav-header">ADMINISTRAÇÃO</li>
+                    <li data-required-permission="coleta"><a href="/admin.html"><i class="fas fa-database"></i> Coleta</a></li>
+                    <li data-required-permission="collections"><a href="/collections.html"><i class="fas fa-history"></i> Histórico de Coletas</a></li>
+                    <li data-required-permission="product_log"><a href="/product-log.html"><i class="fas fa-file-alt"></i> Log de Produtos</a></li>
+                    <li data-required-permission="user_logs"><a href="/user-logs.html"><i class="fas fa-user-clock"></i> Logs de Usuários</a></li>
+                    <li data-required-permission="prune"><a href="/prune.html"><i class="fas fa-broom"></i> Limpeza de Dados</a></li>
+
+                    <li class="nav-header">CONFIGURAÇÃO</li>
+                    <li data-required-permission="markets"><a href="/markets.html"><i class="fas fa-store"></i> Gerenciar Mercados</a></li>
+                    <li data-required-permission="users"><a href="/users.html"><i class="fas fa-users"></i> Gerenciar Usuários</a></li>
+                    <li data-required-permission="users"><a href="/group-admin-users.html"><i class="fas fa-layer-group"></i> Gerenciar Grupos</a></li>
+                    <li data-required-permission="users"><a href="/group-admin.html"><i class="fas fa-user-shield"></i> Subadministradores</a></li>
+                </ul>
+            </nav>
+
+            <!-- BOTÃO DE TEMA -->
+            <div class="theme-switcher">
+                <span>Tema</span>
+                <button id="themeToggle"><i class="fas fa-moon"></i></button>
+            </div>
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <!-- CONTEÚDO PRINCIPAL -->
+        <div class="main-content">
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <button class="mobile-menu-btn" id="mobileMenuBtn">
+                        <span></span><span></span><span></span>
+                    </button>
+                </div>
+                <div class="top-bar-right">
+                    <!-- MENU DE USUÁRIO -->
+                    <div class="user-menu" id="userMenu">
+                        <button class="user-menu-btn" id="userMenuBtn">
+                            <div class="user-avatar">
+                                <img src="https://ui-avatars.com/api/?name=U" alt="User" id="userAvatar">
+                            </div>
+                            <div class="user-info">
+                                <span class="user-name">Usuário</span>
+                                <span class="user-role">...</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="user-dropdown" id="userDropdown">
+                            <a href="/profile.html" class="dropdown-item">
+                                <i class="fas fa-user"></i>
+                                <span>Meu Perfil</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item logout-btn" id="logoutBtn">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Sair</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- CONTEÚDO DA PÁGINA -->
+            <div class="page-content">
+                <main class="admin-panel">
+                    <div class="panel-header">
+                        <i class="fas fa-shopping-basket"></i>
+                        <h2>Minhas Cestas Básicas</h2>
+                    </div>
+                    <p class="panel-description">Crie até 3 cestas, cada uma com no máximo 25 produtos. Use a função "Comparar" para comparar preços por código de barras.</p>
+                    
+                    <button class="btn" id="btnCreateBasket">
+                        <i class="fas fa-plus-circle"></i> Criar Nova Cesta
+                    </button>
+                    
+                    <div id="basketsList" class="results-grid">
+                        <!-- As cestas serão carregadas aqui -->
+                    </div>
+
+                    <h2 class="mt-5" id="resultsTitle" style="display: none;">Resultados da Busca por Produtos na Cesta</h2>
+
+                    <!-- Seção de Cards de Destaque -->
+                    <div class="results-section" id="highlightResults" style="display: none;">
+                        <h3>Cestas em Destaque</h3>
+                        <div class="highlight-cards" id="highlightCards"></div>
+                    </div>
+
+                    <!-- Seção de Demais Mercados -->
+                    <div class="results-section" id="allMarketsResults" style="display: none;">
+                        <h3>Todos os Mercados Comparados</h3>
+                        <div class="cards-grid" id="allMarketsCards"></div>
+                    </div>
+
+                    <div id="realtimeResults" class="table-responsive"></div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CRIAR CESTA -->
+    <div id="createBasketModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5>Criar Nova Cesta</h5>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="createBasketForm">
+                    <div class="form-group">
+                        <label for="basketName">Nome da Cesta:</label>
+                        <input type="text" class="form-control" id="basketName" required maxlength="100">
+                    </div>
+                    <p class="text-muted small">Você pode adicionar os produtos na próxima tela.</p>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-success" id="btnSaveNewBasket">Criar Cesta</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: GERENCIAR PRODUTOS -->
+    <div id="manageProductsModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h5>Gerenciar Produtos da Cesta: <span id="currentBasketName"></span></h5>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info small" id="productCountAlert">0 de 25 produtos.</div>
+                
+                <form id="addProductForm" class="form-inline mb-4">
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="productName" placeholder="Nome do Produto (opcional)" required maxlength="150">
+                    </div>
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="productBarcode" placeholder="Código de Barras" maxlength="20">
+                    </div>
+                    <button type="submit" class="btn" id="btnAddProduct">Adicionar</button>
+                </form>
+
+                <ul id="productsList" class="list-group"></ul>
+
+                <div class="modal-footer">
+                    <button class="btn btn-danger" id="btnClearBasket">Limpar Cesta</button>
+                    <button class="btn" id="btnSearchPrices">Buscar Preços em Mercados</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDITAR PRODUTO -->
+    <div id="editProductModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5>Editar Produto</h5>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="editProductForm">
+                    <input type="hidden" id="editProductIndex">
+                    <div class="form-group">
+                        <label for="editProductName">Nome do Produto:</label>
+                        <input type="text" class="form-control" id="editProductName" required maxlength="150">
+                    </div>
+                    <div class="form-group">
+                        <label for="editProductBarcode">Código de Barras:</label>
+                        <input type="text" class="form-control" id="editProductBarcode" placeholder="Opcional" maxlength="20">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-success">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: COMPARAR CESTA -->
+    <div id="buyBasketModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h5>Comparar Cesta: <span id="buyBasketName"></span></h5>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    Selecione os mercados onde deseja comparar os preços da cesta básica.
+                    <strong>O sistema buscará apenas pelos códigos de barras</strong> dos produtos cadastrados.
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Supermercados para Comparação</h3>
+                    </div>
+                    <div class="card-content">
+                        <details class="market-filters" open>
+                            <summary>
+                                <div class="summary-content">
+                                    <i class="fas fa-store"></i>
+                                    <span>Selecionar Supermercados</span>
+                                    <span class="selection-count" id="selectedMarketsCount">0 selecionados</span>
+                                </div>
+                            </summary>
+                            <div class="filters-container">
+                                <div class="market-search-controls">
+                                    <div class="search-box">
+                                        <i class="fas fa-search"></i>
+                                        <input type="text" id="marketSearch" placeholder="Buscar supermercados...">
+                                        <button class="clear-btn" id="clearMarketSearch">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div class="selection-actions">
+                                        <button class="btn small outline" id="selectAllMarkets">
+                                            <i class="fas fa-check-double"></i>
+                                            Selecionar Todos
+                                        </button>
+                                        <button class="btn small outline" id="deselectAllMarkets">
+                                            <i class="fas fa-times"></i>
+                                            Limpar Seleção
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="supermarket-grid" id="supermarketGrid"></div>
+                            </div>
+                        </details>
+
+                        <div class="form-actions">
+                            <button id="btnCompareBasket" class="btn btn-success" disabled>
+                                <i class="fas fa-shopping-cart"></i>
+                                Comparar Cesta Básica
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAIS: DETALHES -->
+    <div id="marketDetailsModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h5>Detalhes do Mercado</h5>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="marketDetailsContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="compareCestaModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5>Comparação de Cestas Básicas</h5>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="compareCestaContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts finais -->
+    <script src="mobile-menu.js"></script>
+    <script src="user-activity-monitor.js"></script>
+    <script src="cesta.js"></script>
+    <script src="cesta-comprar.js"></script>
+</body>
+</html>

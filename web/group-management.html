@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Grupos | Sistema de Preços</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="designer.css">
+    <link rel="stylesheet" href="group-admin-users.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script src="menu.js"></script>
+    <script src="user-menu.js"></script>
+    <script src="theme.js"></script>
+</head>
+<body class="theme-dark">
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            if (!await requireAuth()) return;
+            await initializeDynamicMenu();
+            await checkAccessExpiration();
+            routeGuard('group_admin'); // Verifique se esta permissão existe
+        });
+    </script>
+
+    <div class="app-container">
+        <!-- Sidebar (igual ao seu código existente) -->
+        <aside class="sidebar" id="sidebarMenu">
+            <!-- ... seu sidebar existente ... -->
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-content">
+            <header class="top-bar">
+                <!-- ... seu header existente ... -->
+            </header>
+
+            <div class="page-content compact-layout">
+                <main class="admin-panel">
+                    <div class="panel-header">
+                        <i class="fas fa-layer-group"></i>
+                        <h2>Gerenciamento de Grupos</h2>
+                        <div class="panel-actions">
+                            <button id="refreshGroupsBtn" class="btn outline"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                        </div>
+                    </div>
+
+                    <!-- Criar Novo Grupo -->
+                    <div class="admin-panel">
+                        <div class="panel-header">
+                            <i class="fas fa-plus-circle"></i>
+                            <h3>Criar Novo Grupo</h3>
+                        </div>
+                        
+                        <div class="config-grid">
+                            <div class="config-group">
+                                <label for="newGroupName">Nome do Grupo</label>
+                                <input type="text" id="newGroupName" class="form-input" placeholder="Digite o nome do grupo" required>
+                            </div>
+                            
+                            <div class="config-group">
+                                <label for="newGroupDiasAcesso">Dias de Acesso</label>
+                                <input type="number" id="newGroupDiasAcesso" class="form-input" value="30" min="1" max="365" required>
+                                <small class="form-hint">Número de dias de acesso padrão para usuários</small>
+                            </div>
+
+                            <div class="config-group full-width">
+                                <label for="newGroupDescription">Descrição</label>
+                                <textarea id="newGroupDescription" class="form-input" placeholder="Descrição opcional do grupo" rows="3"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button id="createGroupBtn" class="btn"><i class="fas fa-layer-group"></i> Criar Grupo</button>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Grupos -->
+                    <div class="admin-panel">
+                        <div class="panel-header">
+                            <i class="fas fa-list"></i>
+                            <h3>Grupos Existentes</h3>
+                        </div>
+                        
+                        <div id="groupsList" class="groups-container">
+                            <div class="empty-state">
+                                <i class="fas fa-spinner fa-spin"></i> Carregando grupos...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Designar Admin de Grupo -->
+                    <div class="admin-panel">
+                        <div class="panel-header">
+                            <i class="fas fa-user-shield"></i>
+                            <h3>Designar Admin de Grupo</h3>
+                        </div>
+                        
+                        <div class="config-grid">
+                            <div class="config-group">
+                                <label for="newGroupAdminUserId">ID do Usuário</label>
+                                <input type="text" id="newGroupAdminUserId" class="form-input" placeholder="Digite o ID do usuário" required>
+                                <small class="form-hint">ID do usuário que será designado como admin</small>
+                            </div>
+
+                            <div class="config-group full-width">
+                                <label>Grupos a Gerenciar</label>
+                                <div class="pages-checkbox-group" id="groupSelectionContainer">
+                                    <!-- Checkboxes serão preenchidos via JavaScript -->
+                                </div>
+                                <small class="form-hint">Selecione os grupos que este admin poderá gerenciar</small>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button id="createGroupAdminBtn" class="btn"><i class="fas fa-user-shield"></i> Designar Admin</button>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Admins de Grupo -->
+                    <div class="admin-panel">
+                        <div class="panel-header">
+                            <i class="fas fa-users"></i>
+                            <h3>Admins de Grupo Designados</h3>
+                        </div>
+                        
+                        <div id="groupAdminsList" class="admins-container">
+                            <div class="empty-state">
+                                <i class="fas fa-spinner fa-spin"></i> Carregando admins...
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modais (adicionar ao final do body) -->
+    <!-- Modal para Editar Grupo -->
+    <div id="editGroupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Editar Grupo</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editGroupForm">
+                    <input type="hidden" id="editGroupId">
+                    <div class="form-group">
+                        <label for="editGroupName">Nome do Grupo</label>
+                        <input type="text" id="editGroupName" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editGroupDiasAcesso">Dias de Acesso</label>
+                        <input type="number" id="editGroupDiasAcesso" class="form-input" min="1" max="365" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editGroupDescription">Descrição</label>
+                        <textarea id="editGroupDescription" class="form-input" rows="3"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn">Salvar Alterações</button>
+                        <button type="button" class="btn outline close-modal">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Editar Admin de Grupo -->
+    <div id="editGroupAdminModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Editar Admin de Grupo</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editGroupAdminForm">
+                    <input type="hidden" id="editGroupAdminUserId">
+                    <div class="form-group">
+                        <label>Usuário</label>
+                        <div id="editGroupAdminUserName" class="form-input view-mode"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Grupos a Gerenciar</label>
+                        <div class="pages-checkbox-group" id="editGroupSelectionContainer">
+                            <!-- Checkboxes serão preenchidos via JavaScript -->
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn">Salvar Alterações</button>
+                        <button type="button" class="btn outline close-modal">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="mobile-menu.js"></script>
+    <script src="user-activity-monitor.js"></script>
+    <script src="group-management.js"></script>
+</body>
+</html>

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Controle - Coleta</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="designer.css">
+    <link rel="stylesheet" href="admin.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script src="menu.js"></script>
+    <script src="user-menu.js"></script>
+    <script src="theme.js"></script>
+</head>
+<body class="theme-dark">
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            if (!await requireAuth()) return;
+            await initializeDynamicMenu();
+            await checkAccessExpiration();
+            routeGuard('coleta');
+        });
+    </script>
+
+    <div class="app-container">
+        <aside class="sidebar" id="sidebarMenu">
+            <div class="sidebar-header">
+                <i class="fas fa-bolt"></i>
+                <h1>Preços AL</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                   <li class="nav-header">ANÁLISE</li>
+                    <li><a href="/search.html"><i class="fas fa-search"></i> Busca</a></li>
+                    <li data-required-permission="compare"><a href="/compare.html"><i class="fas fa-chart-bar"></i> Comparador</a></li>
+                    <li data-required-permission="dashboard"><a href="/dashboard.html"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+                    <li data-required-permission="baskets"><a href="/cesta.html"><i class="fas fa-shopping-basket"></i> Minhas Cestas</a></li>
+                    
+                    <li class="nav-header">ADMINISTRAÇÃO</li>
+                    <li data-required-permission="coleta"><a href="/admin.html"><i class="fas fa-database"></i> Coleta</a></li>
+                    <li data-required-permission="collections"><a href="/collections.html"><i class="fas fa-history"></i> Histórico de Coletas</a></li>
+                    <li data-required-permission="product_log"><a href="/product-log.html"><i class="fas fa-file-alt"></i> Log de Produtos</a></li>
+                    <li data-required-permission="user_logs"><a href="/user-logs.html"><i class="fas fa-user-clock"></i> Logs de Usuários</a></li>
+                    <li data-required-permission="prune"><a href="/prune.html"><i class="fas fa-broom"></i> Limpeza de Dados</a></li>
+
+                    <li class="nav-header">CONFIGURAÇÃO</li>
+                    <li data-required-permission="markets"><a href="/markets.html"><i class="fas fa-store"></i> Gerenciar Mercados</a></li>
+                    <li data-required-permission="users"><a href="/users.html"><i class="fas fa-users"></i> Gerenciar Usuários</a></li>
+                    <li data-required-permission="users"><a href="/group-admin-users.html"><i class="fas fa-layer-group"></i> Gerenciar Grupos</a></li>
+                    <li data-required-permission="users"><a href="/group-admin.html"><i class="fas fa-user-shield"></i> Subadministradores</a></li>
+                </ul>
+            </nav>
+            <div class="theme-switcher">
+                <span>Tema</span>
+                <button id="themeToggle"><i class="fas fa-moon"></i></button>
+            </div>
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-content">
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <button class="mobile-menu-btn" id="mobileMenuBtn">
+                        <span></span><span></span><span></span>
+                    </button>
+                </div>
+                <div class="top-bar-right">
+                    <div class="user-menu" id="userMenu">
+                        <button class="user-menu-btn" id="userMenuBtn">
+                            <div class="user-avatar">
+                                <img src="https://ui-avatars.com/api/?name=U" alt="User" id="userAvatar">
+                            </div>
+                            <div class="user-info">
+                                <span class="user-name">Usuário</span>
+                                <span class="user-role">...</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="user-dropdown" id="userDropdown">
+                            <a href="/profile.html" class="dropdown-item">
+                                <i class="fas fa-user"></i>
+                                <span>Meu Perfil</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item logout-btn" id="logoutBtn">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Sair</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <main class="admin-panel">
+                    <div class="panel-header">
+                        <i class="fas fa-database"></i>
+                        <h2>Coleta de Dados</h2>
+                    </div>
+                    <p class="panel-description">Inicie a coleta de dados de todos os supermercados cadastrados no sistema.</p>
+                    
+                    <!-- Painel de Configuração -->
+                    <div class="coleta-config-panel">
+                        <div class="panel-header">
+                            <i class="fas fa-cog"></i>
+                            <h3>Configuração da Coleta</h3>
+                        </div>
+                        
+                        <div class="config-grid">
+                            <div class="config-group">
+                                <label>Mercados para Coletar</label>
+                                <div class="markets-select" id="marketsContainer">
+                                    <!-- Mercados serão carregados via JavaScript -->
+                                </div>
+                                <div class="selected-count" id="selectedMarketsCount">0 mercados selecionados</div>
+                            </div>
+                            
+                            <div class="config-group">
+                                <label>Dias para Pesquisa</label>
+                                <div class="days-select" id="daysContainer">
+                                    <!-- Dias serão carregados via JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button id="startButton" class="btn"><i class="fas fa-play"></i> Iniciar Coleta Manual</button>
+                    
+                    <!-- Painel de Progresso Detalhado -->
+                    <div id="progress-container" class="progress-container" style="display: none;">
+                        <div class="progress-header">
+                            <div class="progress-title">
+                                <i class="fas fa-sync-alt fa-spin"></i>
+                                <h3>Coleta em Andamento</h3>
+                            </div>
+                            <div class="progress-stats">
+                                <div class="stat-item">
+                                    <span class="stat-value" id="progressPercentText">0%</span>
+                                    <span class="stat-label">Completo</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value" id="etaText">-</span>
+                                    <span class="stat-label">Tempo Restante</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value" id="totalItems">0</span>
+                                    <span class="stat-label">Itens Encontrados</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="progress-bar-master">
+                            <div id="progressBar" class="progress-bar-fill" style="width: 0%"></div>
+                        </div>
+
+                        <div class="progress-details">
+                            <div class="detail-card">
+                                <div class="detail-card-header">
+                                    <i class="fas fa-store"></i>
+                                    <h4>Mercado Atual</h4>
+                                </div>
+                                <div class="detail-card-content">
+                                    <span class="current-market" id="currentMarket">Nenhum</span>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-card">
+                                <div class="detail-card-header">
+                                    <i class="fas fa-box"></i>
+                                    <h4>Produto Atual</h4>
+                                </div>
+                                <div class="detail-card-content">
+                                    <span class="current-product" id="currentProduct">Nenhum</span>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-card">
+                                <div class="detail-card-header">
+                                    <i class="fas fa-chart-bar"></i>
+                                    <h4>Progresso</h4>
+                                </div>
+                                <div class="detail-card-content">
+                                    Mercados: <span id="marketsProcessed">0</span>/<span id="totalMarkets">0</span><br>
+                                    Produtos: <span id="productsInMarket">0</span>/<span id="totalProducts">0</span><br>
+                                    Itens: <span id="itemsInMarket">0</span> neste mercado
+                                </div>
+                            </div>
+                            
+                            <div class="detail-card">
+                                <div class="detail-card-header">
+                                    <i class="fas fa-clock"></i>
+                                    <h4>Tempo</h4>
+                                </div>
+                                <div class="detail-card-content">
+                                    Decorrido: <span id="elapsedTime">0s</span><br>
+                                    Total de Itens: <span id="totalItemsFound">0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="status-indicators">
+                            <div class="status-indicator">
+                                <div class="status-dot active"></div>
+                                <span>Coletando Dados</span>
+                            </div>
+                            <div class="status-indicator">
+                                <div class="status-dot processing"></div>
+                                <span>Processando Mercado</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Relatório Melhorado -->
+                    <div id="report-container" class="admin-panel" style="display: none; margin-top: 2rem;">
+                        <div class="panel-header">
+                            <i class="fas fa-clipboard-list"></i>
+                            <h3>Relatório da Última Coleta</h3>
+                        </div>
+                        
+                        <div class="report-grid">
+                            <div class="report-card success">
+                                <div class="report-card-icon">
+                                    <i class="fas fa-boxes"></i>
+                                </div>
+                                <div class="report-card-value" id="report-total-items">0</div>
+                                <div class="report-card-label">Total de Itens Salvos</div>
+                            </div>
+                            
+                            <div class="report-card">
+                                <div class="report-card-icon">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <div class="report-card-value" id="report-duration">0s</div>
+                                <div class="report-card-label">Duração Total</div>
+                            </div>
+                            
+                            <div class="report-card">
+                                <div class="report-card-icon">
+                                    <i class="fas fa-store"></i>
+                                </div>
+                                <div class="report-card-value" id="report-markets-count">0</div>
+                                <div class="report-card-label">Mercados Processados</div>
+                            </div>
+                            
+                            <div class="report-card warning">
+                                <div class="report-card-icon">
+                                    <i class="fas fa-calendar-day"></i>
+                                </div>
+                                <div class="report-card-value" id="report-days">3</div>
+                                <div class="report-card-label">Dias de Pesquisa</div>
+                            </div>
+                        </div>
+                        
+                        <h4 class="table-title">Detalhes por Mercado:</h4>
+                        <div class="report-table-container">
+                            <table class="report-table" id="reportTable">
+                                <thead>
+                                    <tr>
+                                        <th>Mercado</th>
+                                        <th>Itens Encontrados</th>
+                                        <th>Duração</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Linhas serão preenchidas via JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+    <script src="mobile-menu.js"></script>
+    <script src="user-activity-monitor.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>
+
+
+
+
+

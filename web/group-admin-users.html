@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Usuários do Grupo | Sistema de Preços</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="designer.css">
+    <link rel="stylesheet" href="group-admin-users.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script src="menu.js"></script>
+    <script src="user-menu.js"></script>
+    <script src="theme.js"></script>
+</head>
+<body class="theme-dark">
+   <script>
+    document.addEventListener('DOMContentLoaded', async function() {
+        if (!await requireAuth()) return;
+        await initializeDynamicMenu();
+        await checkAccessExpiration();
+        routeGuard('group_admin_users'); // <- Adicione esta linha
+    });
+</script>
+
+    <div class="app-container">
+        <aside class="sidebar" id="sidebarMenu">
+            <div class="sidebar-header">
+                <i class="fas fa-bolt"></i>
+                <h1>Preços AL</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="nav-header">ANÁLISE</li>
+                    <li><a href="/search.html"><i class="fas fa-search"></i> Busca</a></li>
+                    <li data-required-permission="compare"><a href="/compare.html"><i class="fas fa-chart-bar"></i> Comparador</a></li>
+                    <li data-required-permission="dashboard"><a href="/dashboard.html"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+                    <li data-required-permission="baskets"><a href="/cesta.html"><i class="fas fa-shopping-basket"></i> Minhas Cestas</a></li>
+                    
+                    <li class="nav-header">ADMINISTRAÇÃO</li>
+                    <li data-required-permission="coleta"><a href="/admin.html"><i class="fas fa-database"></i> Coleta</a></li>
+                    <li data-required-permission="collections"><a href="/collections.html"><i class="fas fa-history"></i> Histórico de Coletas</a></li>
+                    <li data-required-permission="product_log"><a href="/product-log.html"><i class="fas fa-file-alt"></i> Log de Produtos</a></li>
+                    <li data-required-permission="user_logs"><a href="/user-logs.html"><i class="fas fa-user-clock"></i> Logs de Usuários</a></li>
+                    <li data-required-permission="prune"><a href="/prune.html"><i class="fas fa-broom"></i> Limpeza de Dados</a></li>
+
+                    <li class="nav-header">CONFIGURAÇÃO</li>
+                    <li data-required-permission="markets"><a href="/markets.html"><i class="fas fa-store"></i> Gerenciar Mercados</a></li>
+                    <li data-required-permission="users"><a href="/users.html"><i class="fas fa-users"></i> Gerenciar Usuários</a></li>
+                    <li data-required-permission="users"><a href="/group-admin-users.html" class="active"><i class="fas fa-layer-group"></i> Gerenciar Grupos</a></li>
+                    <li data-required-permission="users"><a href="/group-admin.html"><i class="fas fa-user-shield"></i> Subadministradores</a></li>
+                </ul>
+            </nav>
+            <div class="theme-switcher">
+                <span>Tema</span>
+                <button id="themeToggle"><i class="fas fa-moon"></i></button>
+            </div>
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-content">
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <button class="mobile-menu-btn" id="mobileMenuBtn">
+                        <span></span><span></span><span></span>
+                    </button>
+                </div>
+                <div class="top-bar-right">
+                    <div class="user-menu" id="userMenu">
+                        <button class="user-menu-btn" id="userMenuBtn">
+                            <div class="user-avatar">
+                                <img src="https://ui-avatars.com/api/?name=U" alt="User" id="userAvatar">
+                            </div>
+                            <div class="user-info">
+                                <span class="user-name" id="userName">Usuário</span>
+                                <span class="user-role" id="userRole">...</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="user-dropdown" id="userDropdown">
+                            <a href="/profile.html" class="dropdown-item">
+                                <i class="fas fa-user"></i>
+                                <span>Meu Perfil</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item logout-btn" id="logoutBtn">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Sair</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content compact-layout">
+                <main class="admin-panel">
+                    <div class="panel-header">
+                        <i class="fas fa-users"></i>
+                        <h2>Gerenciar Usuários do Meu Grupo</h2>
+                    </div>
+                    <p class="panel-description" id="groupDescription">Crie e gerencie usuários no seu grupo designado.</p>
+                    
+                    <!-- Informações do Grupo -->
+                    <div class="admin-panel">
+                        <div class="panel-header">
+                            <i class="fas fa-layer-group"></i>
+                            <h3>Informações do Grupo</h3>
+                        </div>
+                        <div class="config-grid">
+                            <div class="config-group">
+                                <label>Grupo Atual</label>
+                                <div id="currentGroupInfo" class="group-info">
+                                    <i class="fas fa-spinner fa-spin"></i> Carregando...
+                                </div>
+                            </div>
+                            <div class="config-group">
+                                <label>Usuários Ativos</label>
+                                <div id="activeUsersCount" class="group-info">
+                                    <i class="fas fa-spinner fa-spin"></i> Carregando...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Criar Novo Usuário -->
+                    <div class="admin-panel">
+                        <div class="panel-header">
+                            <i class="fas fa-user-plus"></i>
+                            <h3>Criar Novo Usuário</h3>
+                        </div>
+                        
+                        <div class="config-grid">
+                            <div class="config-group">
+                                <label for="newUserName">Nome Completo</label>
+                                <input type="text" id="newUserName" class="form-input" placeholder="Digite o nome do usuário" required>
+                            </div>
+                            
+                            <div class="config-group">
+                                <label for="newUserEmail">Email</label>
+                                <input type="email" id="newUserEmail" class="form-input" placeholder="Digite o email do usuário" required>
+                            </div>
+                            
+                            <div class="config-group">
+                                <label for="newUserPassword">Senha</label>
+                                <input type="password" id="newUserPassword" class="form-input" placeholder="Digite a senha" required>
+                                <small class="form-hint">Mínimo de 6 caracteres</small>
+                            </div>
+
+                            <div class="config-group full-width">
+                                <label for="newUserAllowedPages">Páginas Permitidas</label>
+                                <div class="pages-checkbox-group" id="allowedPagesContainer">
+                                    <!-- Checkboxes serão gerados via JavaScript -->
+                                </div>
+                                <small class="form-hint">Selecione as páginas que este usuário poderá acessar</small>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button id="createUserBtn" class="btn"><i class="fas fa-user-plus"></i> Criar Usuário</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Lista de Usuários do Grupo -->
+                    <div class="admin-panel">
+                        <div class="panel-header">
+                            <i class="fas fa-list"></i>
+                            <h3>Usuários do Meu Grupo</h3>
+                            <div class="panel-actions">
+                                <button id="refreshUsersBtn" class="btn outline"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                            </div>
+                        </div>
+                        
+                        <div class="table-container">
+                            <table class="data-table" id="groupUsersTable">
+                                <thead>
+                                    <tr>
+                                        <th>Usuário</th>
+                                        <th>Email</th>
+                                        <th>Páginas Permitidas</th>
+                                        <th>Data de Expiração</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="6" class="empty-state">
+                                            <i class="fas fa-spinner fa-spin"></i> Carregando usuários...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Visualizar Permissões -->
+    <div id="viewPermissionsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Permissões do Usuário</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nome</label>
+                    <div id="viewUserName" class="form-input view-mode"></div>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <div id="viewUserEmail" class="form-input view-mode"></div>
+                </div>
+                <div class="form-group">
+                    <label>Data de Expiração</label>
+                    <div id="viewUserExpiration" class="form-input view-mode"></div>
+                </div>
+                <div class="form-group">
+                    <label>Páginas Permitidas</label>
+                    <div id="viewUserPermissions" class="permissions-list">
+                        <!-- Permissões serão preenchidas via JavaScript -->
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn outline close-modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Editar Usuário -->
+    <div id="editUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Editar Usuário</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <input type="hidden" id="editUserId">
+                    <div class="form-group">
+                        <label for="editUserName">Nome Completo</label>
+                        <input type="text" id="editUserName" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editUserEmail">Email</label>
+                        <input type="email" id="editUserEmail" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editUserAllowedPages">Páginas Permitidas</label>
+                        <div class="pages-checkbox-group" id="editAllowedPagesContainer">
+                            <!-- Checkboxes serão gerados via JavaScript -->
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editUserExpiration">Data de Expiração</label>
+                        <input type="date" id="editUserExpiration" class="form-input" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn">Salvar Alterações</button>
+                        <button type="button" class="btn outline close-modal">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Renovar Acesso -->
+    <div id="renewAccessModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Renovar Acesso do Usuário</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="renewAccessForm">
+                    <input type="hidden" id="renewUserId">
+                    <div class="form-group">
+                        <label for="renewDays">Dias Adicionais</label>
+                        <select id="renewDays" class="form-select" required>
+                            <option value="30">30 dias</option>
+                            <option value="60">60 dias</option>
+                            <option value="90">90 dias</option>
+                            <option value="180">180 dias</option>
+                            <option value="365">365 dias</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Nova Data de Expiração</label>
+                        <div id="newExpirationDate" class="expiration-preview"></div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn">Renovar Acesso</button>
+                        <button type="button" class="btn outline close-modal">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="mobile-menu.js"></script>
+    <script src="user-activity-monitor.js"></script>
+    <script src="group-admin-users.js"></script>
+</body>
+</html>
